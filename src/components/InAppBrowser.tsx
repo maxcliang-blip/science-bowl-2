@@ -5,10 +5,28 @@ import React, { useState, useRef } from 'react';
 const InAppBrowser = () => {
   const [url, setUrl] = useState('https://example.com');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   
-  const handleSubmit = (e) => {
+  const validateUrl = (inputUrl: string): boolean => {
+    try {
+      const parsedUrl = new URL(inputUrl);
+      // Only allow http and https protocols
+      return parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+    
+    if (!validateUrl(url)) {
+      setError('Invalid URL. Only http:// and https:// URLs are allowed.');
+      return;
+    }
+    
     setLoading(true);
     if (iframeRef.current) {
       iframeRef.current.src = url;
@@ -21,8 +39,16 @@ const InAppBrowser = () => {
       <div className="w-full max-w-2xl bg-white bg-opacity-90 rounded-xl p-6 shadow-xl">
         <h2 className="text-3xl font-extrabold text-gray-800 mb-2">In-App Browser</h2>
         <p className="text-gray-600 mb-6">Browse the web without leaving our app</p>
+        
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+            {error}
+          </div>
+        )}
+        
         <form onSubmit={handleSubmit} className="mb-6">
-          <input            type="url"
+          <input
+            type="url"
             defaultValue="https://example.com"
             onChange={(e) => setUrl(e.target.value)}
             placeholder="Enter URL"
@@ -37,6 +63,7 @@ const InAppBrowser = () => {
             {loading ? 'Loading...' : 'Open'}
           </button>
         </form>
+        
         <div className="relative">
           <iframe
             ref={iframeRef}
@@ -44,8 +71,10 @@ const InAppBrowser = () => {
             className="w-full h-96 rounded-lg border border-gray-200"
             src={url}
             onLoad={() => setLoading(false)}
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
           />
         </div>
+        
         <div className="mt-4 text-sm text-gray-400">
           Tip: Use https:// links for best results
         </div>

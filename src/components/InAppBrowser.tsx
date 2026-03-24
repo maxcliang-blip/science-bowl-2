@@ -1,17 +1,9 @@
 "use client";
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { ArrowLeft, ArrowRight, RotateCw, Lock, Globe } from 'lucide-react';
 
 const InAppBrowser = () => {
-  // Password protection state
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [password, setPassword] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
-  const maxAttempts = 3;
-  const [attempts, setAttempts] = useState(0);
-  
-  // Browser state
   const [url, setUrl] = useState('https://example.com');
   const [inputUrl, setInputUrl] = useState('https://example.com');
   const [loading, setLoading] = useState(false);
@@ -108,75 +100,6 @@ const InAppBrowser = () => {
   };
 
   const isHttps = url.startsWith('https://');
-
-  // Password handling
-  const handlePasswordSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password === 'password123') {
-      setIsAuthenticated(true);
-      setAttempts(0);
-      setErrorMessage('');
-      // Reset browser state when successfully authenticated
-      setUrl('https://example.com');
-      setInputUrl('https://example.com');
-      setHistory([ 'https://example.com' ]);
-      setHistoryIndex(0);
-      setError(null);
-      setLoading(false);
-    } else {
-      setAttempts(prev => prev + 1);
-      if (attempts >= maxAttempts) {
-        setErrorMessage('Too many failed attempts. Please refresh the page.');
-      } else {
-        setErrorMessage(`Incorrect password. ${maxAttempts - attempts} attempts remaining.`);
-      }
-    }
-  };
-
-  // If not authenticated, show password screen
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100">
-        <div className="bg-white bg-opacity-90 p-8 rounded-xl shadow-lg w-full max-w-md">
-          <h1 className="text-3xl font-bold text-center text-gray-800 mb-6">Secure Browser</h1>
-          <p className="text-center text-gray-600 mb-8">Enter password to access the browser</p>
-          
-          {errorMessage && (
-            <div className="mb-6 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg">
-              {errorMessage}
-            </div>
-          )}
-          
-          <form onSubmit={handlePasswordSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                disabled={attempts >= maxAttempts}
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={attempts >= maxAttempts}
-              className="w-full rounded-md bg-indigo-600 py-2 px-4 text-sm font-medium text-white hover:bg-indigo-700 transition-colors disabled:opacity-50"
-            >
-              Enter Password
-            </button>
-          </form>
-          
-          <div className="text-center mt-6 text-sm text-gray-500">
-            <a href="#" className="hover:text-indigo-600">
-              Forgot password?
-            </a>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-100">

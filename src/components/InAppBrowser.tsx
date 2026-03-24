@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { ArrowLeft, ArrowRight, RotateCw, Lock, Globe } from 'lucide-react';
 
 const InAppBrowser = () => {
@@ -10,9 +10,6 @@ const InAppBrowser = () => {
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<string[]>([ 'https://example.com' ]);
   const [historyIndex, setHistoryIndex] = useState(0);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loginError, setLoginError] = useState<string | null>(null);
-  const [password, setPassword] = useState('');
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const canGoBack = historyIndex > 0;
@@ -25,19 +22,6 @@ const InAppBrowser = () => {
     } catch {
       return false;
     }
-  };
-
-  const authenticate = (pass: string) => {
-    // In a real implementation, you would check against a secure database
-    // For this example, we'll use a hardcoded password
-    const validPassword = 'LAXMIANG';
-    if (pass === validPassword) {
-      setIsAuthenticated(true);
-      setLoginError(null);
-      return true;
-    }
-    setLoginError('Invalid password');
-    return false;
   };
 
   const navigateTo = (newUrl: string) => {
@@ -59,15 +43,6 @@ const InAppBrowser = () => {
     
     if (iframeRef.current) {
       iframeRef.current.src = newUrl;
-    }
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isAuthenticated) {
-      authenticate(password);
-    } else {
-      navigateTo(inputUrl);
     }
   };
 
@@ -108,6 +83,11 @@ const InAppBrowser = () => {
 
   const handleIframeLoad = () => {
     setLoading(false);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    navigateTo(inputUrl);
   };
 
   const getFavicon = (url: string) => {
@@ -202,48 +182,14 @@ const InAppBrowser = () => {
               </div>
             </div>
           )}
-          {isAuthenticated ? (
-            <iframe
-              ref={iframeRef}
-              title="In-App Browser"
-              className="w-full h-full border-none"
-              src={url}
-              onLoad={handleIframeLoad}
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
-            />
-          ) : (
-            <div className="flex items-center justify-center min-h-screen bg-gray-100">
-              <div className="bg-white rounded-xl p-8 shadow-lg">
-                <h1 className="text-3xl font-bold mb-4">Browser Locked</h1>
-                <p className="text-lg text-gray-600 mb-6">
-                  Please enter your password to access the browser
-                </p>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="space-y-1">
-                    <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                      Password
-                    </label>
-                    <input
-                      type="password"
-                      id="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                    />
-                  </div>
-                  {loginError && (
-                    <p className="text-red-600 text-sm">{loginError}</p>
-                  )}
-                  <button
-                    type="submit"
-                    className="w-full bg-indigo-600 text-white font-medium rounded-lg px-4 py-3 hover:bg-indigo-700 transition-colors"
-                  >
-                    Unlock Browser
-                  </button>
-                </form>
-              </div>
-            </div>
-          )}
+          <iframe
+            ref={iframeRef}
+            title="In-App Browser"
+            className="w-full h-full border-none"
+            src={url}
+            onLoad={handleIframeLoad}
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+          />
         </div>
       </div>
 

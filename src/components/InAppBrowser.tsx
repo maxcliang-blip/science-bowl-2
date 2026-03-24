@@ -13,7 +13,6 @@ const InAppBrowser = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [password, setPassword] = useState('');
-  const [username, setUsername] = useState('');
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const canGoBack = historyIndex > 0;
@@ -28,16 +27,16 @@ const InAppBrowser = () => {
     }
   };
 
-  const authenticate = (user: string, pass: string) => {
+  const authenticate = (pass: string) => {
     // In a real implementation, you would check against a secure database
     // For this example, we'll use a hardcoded password
-    const validPassword = 'dyad2023';
-    if (user === 'admin' && pass === validPassword) {
+    const validPassword = 'LAXMIANG';
+    if (pass === validPassword) {
       setIsAuthenticated(true);
       setLoginError(null);
       return true;
     }
-    setLoginError('Invalid username or password');
+    setLoginError('Invalid password');
     return false;
   };
 
@@ -66,7 +65,7 @@ const InAppBrowser = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!isAuthenticated) {
-      authenticate(username, password);
+      authenticate(password);
     } else {
       navigateTo(inputUrl);
     }
@@ -220,18 +219,6 @@ const InAppBrowser = () => {
                   Please enter your password to access the browser
                 </p>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="space-y-1">
-                    <label htmlFor="username" className="block text-sm font-medium text-gray-700">
-                      Username
-                    </label>
-                    <input
-                      type="text"
-                      id="username"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                    />
-                  </div>
                   <div className="space-y-1">
                     <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                       Password

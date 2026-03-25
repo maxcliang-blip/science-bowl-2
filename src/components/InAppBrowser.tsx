@@ -1,32 +1,61 @@
 "use client";
 
-import React, { useState, useRef } from 'react';
-import { ArrowLeft, ArrowRight, RotateCw, Lock, Globe } from 'lucide-react';
+import React, { useState, useRef, useEffect } from "react";
+import { ArrowLeft, ArrowRight, RotateCw, Lock, Globe, Bookmark } from "lucide-react";
+import { Button, Popover } from "@/components/ui";
+import { showSuccess } from "@/utils/toast";
 
 const InAppBrowser = () => {
-  const [url, setUrl] = useState('https://example.com');
-  const [inputUrl, setInputUrl] = useState('https://example.com');
+  const [url, setUrl] = useState("https://example.com");
+  const [inputUrl, setInputUrl] = useState("https://example.com");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [history, setHistory] = useState<string[]>([ 'https://example.com' ]);
+  const [history, setHistory] = useState<string[]>([ "https://example.com" ]);
   const [historyIndex, setHistoryIndex] = useState(0);
+  const [showBookmarks, setShowBookmarks] = useState(false);
+  const [bookmarks, setBookmarks] = useState<string[]>([]);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const canGoBack = historyIndex > 0;
   const canGoForward = historyIndex < history.length - 1;
 
+  // Load bookmarks from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("browserBookmarks");
+    if (saved) {
+      setBookmarks(JSON.parse(saved));
+    }
+  }, []);
+
+  // Save bookmarks to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem("browserBookmarks", JSON.stringify(bookmarks));
+  }, [bookmarks]);
+
   const validateUrl = (inputUrl: string): boolean => {
     try {
       const parsedUrl = new URL(inputUrl);
-      return parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:';
+      return parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
     } catch {
       return false;
     }
   };
 
+  const addToBookmarks = (url: string) => {
+    if (!bookmarks.includes(url)) {
+      setBookmarks([...bookmarks, url]);
+      showSuccess("Bookmark added");
+    }
+  };
+
+  const removeBookmark = (urlToRemove: string) => {
+    setBookmarks(bookmarks.filter((url) => url !== urlToRemove));
+    showSuccess("Bookmark removed");
+  };
+
   const navigateTo = (newUrl: string) => {
     if (!validateUrl(newUrl)) {
-      setError('Invalid URL. Only http:// and https:// URLs are allowed.');
+      setError("Invalid URL. Only http:// and https:// URLs are allowed.");
       return;
     }
 
@@ -44,6 +73,9 @@ const InAppBrowser = () => {
     if (iframeRef.current) {
       iframeRef.current.src = newUrl;
     }
+    
+    // Add current URL to bookmarks automatically
+    addToBookmarks(newUrl);
   };
 
   const goBack = () => {
@@ -99,7 +131,37 @@ const InAppBrowser = () => {
     }
   };
 
-  const isHttps = url.startsWith('https://');
+  const isHttps = url.startsWith("https://");
+
+  const handleBookmarkClick = (url: string) => {
+    navigateTo(url);
+    setShowBookmarks(false);
+  };
+
+  const bookmarksMenuItems = bookmarks.map((url) => (
+    <div
+      key={url}
+      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer"
+      onClick={() => handleBookmarkClick(url)}
+    >
+      <img
+        src={`https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=24`}
+        alt=""
+        className="w-6 h-6 object-contain"
+        onError={(e) => { e.currentTarget.style.display = "none"; }}
+      />
+      <span className="flex-1 text-sm text-gray-700 truncate">{url}</span>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          removeBookmark(url);
+        }}
+        className="text-red-500 hover:text-red-700 text-sm"
+      >
+        Remove
+      </button>
+    </div>
+  ));
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-100">
@@ -131,6 +193,29 @@ const InAppBrowser = () => {
             >
               <RotateCw size={18} className={`text-gray-700 ${loading ? 'animate-spin' : ''}`} />
             </button>
+            
+            {/* Bookmarks button */}
+            <Popover.Root open={showBookmarks} onOpenChange={setShowBookmarks}>
+              <Popover.Trigger as={Button} className="p-2 rounded-full hover:bg-gray-200">
+                <Bookmark size={18} className="text-gray-700" />
+              </Popover.Trigger>
+              <Popover.Content className="w-80 bg-white border border-gray-200 rounded-md shadow-sm">
+                {bookmarks.length > 0 ? (
+                  <div className="py-1">
+                    <div className="px-3 py-2 border-b border-gray-100">
+                      <div className="text-sm font-medium text-gray-700">Bookmarks</div>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto">
+                      {bookmarksMenuItems}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="px-3 py-4 text-center text-sm text-gray-400">
+                    No bookmarks yet
+                  </div>
+                )}
+              </Popover.Content>
+            </Popover.Root>
             
             {/* URL bar */}
             <form onSubmit={handleSubmit} className="flex-1 relative">

@@ -2,8 +2,10 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { ArrowLeft, ArrowRight, RotateCw, Lock, Globe, Bookmark } from "lucide-react";
-import { Button, Popover } from "@/components/ui";
+import { Button } from "@/components/ui";
+import { Popover, PopoverTrigger, PopoverContent } from "@radix-ui/react-popover"; // <-- Use Radix UI types
 import { showSuccess } from "@/utils/toast";
+import { useToast } from "@/hooks/use-toast"; // <-- Fix missing useToast import
 
 const InAppBrowser = () => {
   const [url, setUrl] = useState("https://example.com");
@@ -15,6 +17,7 @@ const InAppBrowser = () => {
   const [showBookmarks, setShowBookmarks] = useState(false);
   const [bookmarks, setBookmarks] = useState<string[]>([]);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const { toast } = useToast(); // <-- Now properly typed
 
   const canGoBack = historyIndex > 0;
   const canGoForward = historyIndex < history.length - 1;
@@ -44,13 +47,13 @@ const InAppBrowser = () => {
   const addToBookmarks = (url: string) => {
     if (!bookmarks.includes(url)) {
       setBookmarks([...bookmarks, url]);
-      showSuccess("Bookmark added");
+      toast.success("Bookmark added"); // <-- Fixed toast method
     }
   };
 
   const removeBookmark = (urlToRemove: string) => {
     setBookmarks(bookmarks.filter((url) => url !== urlToRemove));
-    showSuccess("Bookmark removed");
+    toast.success("Bookmark removed"); // <-- Fixed toast method
   };
 
   const navigateTo = (newUrl: string) => {
@@ -202,7 +205,7 @@ const InAppBrowser = () => {
               <Popover.Content className="w-80 bg-white border border-gray-200 rounded-md shadow-sm">
                 {bookmarks.length > 0 ? (
                   <div className="py-1">
-                    <div className="px-3 py-2 border-b border-gray-100">
+                    <div className="px-3 py-1 border-b border-gray-100">
                       <div className="text-sm font-medium text-gray-700">Bookmarks</div>
                     </div>
                     <div className="max-h-64 overflow-y-auto">

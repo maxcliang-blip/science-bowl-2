@@ -63,7 +63,8 @@ const InAppBrowser = () => {
     setError(null);
     setLoading(true);
     setUrl(newUrl);
-        // Update history
+    
+    // Update history
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push(newUrl);
     setHistory(newHistory);
@@ -196,8 +197,10 @@ const InAppBrowser = () => {
             
             {/* Bookmarks button */}
             <Popover open={showBookmarks} onOpenChange={setShowBookmarks}>
-              <PopoverTrigger as={Button} className="p-2 rounded-full hover:bg-gray-200">
-                <Bookmark size={18} className="text-gray-700" />
+              <PopoverTrigger asChild>
+                <Button className="p-2 rounded-full hover:bg-gray-200">
+                  <Bookmark size={18} className="text-gray-700" />
+                </Button>
               </PopoverTrigger>
               <PopoverContent className="w-80 bg-white border border-gray-200 rounded-md shadow-sm">
                 {bookmarks.length > 0 ? (
@@ -211,8 +214,7 @@ const InAppBrowser = () => {
                   </div>
                 ) : (
                   <div className="px-3 py-4 text-center text-sm text-gray-400">
-                    No bookmarks yet
-                  </div>
+                    No bookmarks yet                  </div>
                 )}
               </PopoverContent>
             </Popover>
@@ -228,15 +230,12 @@ const InAppBrowser = () => {
                   )}
                 </div>
                 {getFavicon(url) && (
-                  <img 
-                    src={getFavicon(url)!} 
-                    alt="" 
-                    className="w-4 h-4 mr-2"
+                  <img                     src={getFavicon(url)!} 
+                    alt=""                     className="w-4 h-4 mr-2"
                     onError={(e) => { e.currentTarget.style.display = 'none'; }}
                   />
                 )}
-                <input
-                  type="text"
+                <input                  type="text"
                   value={inputUrl}
                   onChange={(e) => setInputUrl(e.target.value)}
                   placeholder="Search or enter URL"

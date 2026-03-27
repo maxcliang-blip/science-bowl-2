@@ -3,9 +3,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { ArrowLeft, ArrowRight, RotateCw, Lock, Globe, Bookmark } from "lucide-react";
 import { Button } from "@/components/ui";
-import { Popover, PopoverTrigger, PopoverContent } from "@radix-ui/react-popover"; // <-- Use Radix UI types
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui";
 import { showSuccess } from "@/utils/toast";
-import { useToast } from "@/hooks/use-toast"; // <-- Fix missing useToast import
 
 const InAppBrowser = () => {
   const [url, setUrl] = useState("https://example.com");
@@ -17,7 +16,6 @@ const InAppBrowser = () => {
   const [showBookmarks, setShowBookmarks] = useState(false);
   const [bookmarks, setBookmarks] = useState<string[]>([]);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const { toast } = useToast(); // <-- Now properly typed
 
   const canGoBack = historyIndex > 0;
   const canGoForward = historyIndex < history.length - 1;
@@ -47,13 +45,13 @@ const InAppBrowser = () => {
   const addToBookmarks = (url: string) => {
     if (!bookmarks.includes(url)) {
       setBookmarks([...bookmarks, url]);
-      toast.success("Bookmark added"); // <-- Fixed toast method
+      showSuccess("Bookmark added");
     }
   };
 
   const removeBookmark = (urlToRemove: string) => {
     setBookmarks(bookmarks.filter((url) => url !== urlToRemove));
-    toast.success("Bookmark removed"); // <-- Fixed toast method
+    showSuccess("Bookmark removed");
   };
 
   const navigateTo = (newUrl: string) => {
@@ -65,8 +63,7 @@ const InAppBrowser = () => {
     setError(null);
     setLoading(true);
     setUrl(newUrl);
-    
-    // Update history
+        // Update history
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push(newUrl);
     setHistory(newHistory);
@@ -198,11 +195,11 @@ const InAppBrowser = () => {
             </button>
             
             {/* Bookmarks button */}
-            <Popover.Root open={showBookmarks} onOpenChange={setShowBookmarks}>
-              <Popover.Trigger as={Button} className="p-2 rounded-full hover:bg-gray-200">
+            <Popover open={showBookmarks} onOpenChange={setShowBookmarks}>
+              <PopoverTrigger as={Button} className="p-2 rounded-full hover:bg-gray-200">
                 <Bookmark size={18} className="text-gray-700" />
-              </Popover.Trigger>
-              <Popover.Content className="w-80 bg-white border border-gray-200 rounded-md shadow-sm">
+              </PopoverTrigger>
+              <PopoverContent className="w-80 bg-white border border-gray-200 rounded-md shadow-sm">
                 {bookmarks.length > 0 ? (
                   <div className="py-1">
                     <div className="px-3 py-1 border-b border-gray-100">
@@ -217,8 +214,8 @@ const InAppBrowser = () => {
                     No bookmarks yet
                   </div>
                 )}
-              </Popover.Content>
-            </Popover.Root>
+              </PopoverContent>
+            </Popover>
             
             {/* URL bar */}
             <form onSubmit={handleSubmit} className="flex-1 relative">

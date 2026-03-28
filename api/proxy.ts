@@ -1,4 +1,11 @@
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
 export default async function handler(req, res) {
+  console.log('[Proxy] Request received:', req.query.url);
   const { url } = req.query;
 
   if (!url) {
@@ -286,6 +293,10 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('Proxy error:', error);
-    return res.status(500).json({ error: 'Failed to fetch URL', details: error.message });
+    return res.status(500).json({ 
+      error: 'Failed to fetch URL', 
+      details: error.message,
+      stack: error.stack 
+    });
   }
 }

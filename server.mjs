@@ -145,6 +145,18 @@ async function proxyHandler(req, res) {
 app.get('/api/proxy', proxyHandler);
 app.post('/api/proxy', proxyHandler);
 
+app.get('/api/test', async (req, res) => {
+  try {
+    console.log('[Test] Attempting fetch...');
+    const response = await fetch('https://example.com');
+    console.log('[Test] Success');
+    res.json({ success: true, status: response.status });
+  } catch (error) {
+    console.log('[Test] Error:', error);
+    res.status(500).json({ error: error.message, code: error.code });
+  }
+});
+
 app.use(express.static(path.join(__dirname, 'dist')));
 
 app.use((req, res) => {

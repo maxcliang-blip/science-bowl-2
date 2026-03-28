@@ -1,3 +1,5 @@
+export const runtime = 'nodejs';
+
 export default async function handler(req, res) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10000);

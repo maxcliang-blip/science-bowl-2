@@ -1,8 +1,17 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "runtime": "nodejs",
   "rewrites": [
     {
-      "source": "/((?!api/).*)",
+      "source": "/api/test",
+      "destination": "/api/test"
+    },
+    {
+      "source": "/api/proxy",
+      "destination": "/api/proxy"
+    },
+    {
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ]

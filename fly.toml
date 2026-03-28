@@ -1,0 +1,30 @@
+app = 'science-bowl-2'
+primary_region = 'iad'
+
+[build]
+
+[env]
+  PORT = "8080"
+
+[[http_services]]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+
+  [[http_services.ports]]
+    handlers = ["http"]
+    port = 80
+
+  [[http_services.ports]]
+    handlers = ["tls", "http1"]
+    port = 443
+
+  [httpServices.concurrency]
+    type = "connections"
+    hard_limit = 25
+    soft_limit = 20
+
+[[statics]]
+  guest_path = "/app/dist"
+  url_prefix = "/"

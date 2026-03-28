@@ -27,6 +27,7 @@ async function proxyHandler(req, res) {
   }
 
   try {
+    console.log('[Proxy] Fetching:', url);
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -34,6 +35,7 @@ async function proxyHandler(req, res) {
         'Accept-Language': 'en-US,en;q=0.5',
       },
     });
+    console.log('[Proxy] Fetch success:', response.status);
 
     const contentType = response.headers.get('content-type') || '';
 
@@ -134,7 +136,9 @@ async function proxyHandler(req, res) {
 
   } catch (error) {
     console.error('Proxy error:', error);
-    return res.status(500).json({ error: 'Failed to fetch URL', details: error.message });
+    console.error('Error name:', error.name);
+    console.error('Error code:', error.code);
+    return res.status(500).json({ error: 'Failed to fetch URL', details: error.message, code: error.code });
   }
 }
 

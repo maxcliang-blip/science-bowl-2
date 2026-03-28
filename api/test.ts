@@ -1,24 +1,23 @@
 export default async function handler(req, res) {
-  console.log('[Test] Request received');
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
   
   try {
-    console.log('[Test] Attempting fetch...');
-    const response = await fetch('https://example.com');
-    console.log('[Test] Fetch successful');
-    
-    const text = await response.text();
-    console.log('[Test] Response length:', text.length);
+    const response = await fetch('https://example.com', {
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
     
     return res.status(200).json({ 
       success: true, 
-      length: text.length,
-      preview: text.substring(0, 200)
+      status: response.status 
     });
   } catch (error) {
-    console.error('[Test] Error:', error);
+    clearTimeout(timeout);
     return res.status(500).json({ 
       error: error.message,
-      name: error.name
+      name: error.name,
+      type: error.type
     });
   }
 }

@@ -1,4 +1,4 @@
-run = "node server.js"
+run = "bash setup.sh"
 language = "nodejs"
 entrypoint = "server.js"
 
@@ -6,5 +6,5 @@ entrypoint = "server.js"
 channel = "stable-23_05"
 
 [deployment]
-run = ["node", "server.js"]
+run = ["bash", "setup.sh"]
 deploymentTarget = "cloudrun"

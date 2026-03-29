@@ -1,0 +1,10 @@
+run = "node server.js"
+language = "nodejs"
+entrypoint = "server.js"
+
+[nix]
+channel = "stable-23_05"
+
+[deployment]
+run = ["node", "server.js"]
+deploymentTarget = "cloudrun"

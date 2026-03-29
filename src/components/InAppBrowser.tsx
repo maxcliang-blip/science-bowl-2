@@ -25,7 +25,7 @@ const MAX_CLOSED_TABS = 20;
 const MAX_HISTORY = 50;
 const ZOOM_LEVELS = [50, 75, 90, 100, 110, 125, 150, 175, 200];
 const BROWSER_PASSWORD = "LAXMIANG";
-const PROXY_URL = "https://api.allorigins.win/get?url=";
+const PROXY_URL = "https://YOUR-PROXY-URL/proxy?url=";
 
 const InAppBrowser = () => {
   const [tabs, setTabs] = useState<Tab[]>([createNewTab("https://example.com")]);

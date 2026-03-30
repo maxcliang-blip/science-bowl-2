@@ -1,6 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
-serve(async (req) => {
+export default async function(req: Request): Promise<Response> {
   const url = new URL(req.url).searchParams.get("url");
 
   if (!url) {
@@ -56,7 +54,7 @@ serve(async (req) => {
       html = `<head>${proxyScripts}<base href="${targetUrl.origin}"></head>` + html;
     }
 
-    const rewriteUrl = (u) => {
+    const rewriteUrl = (u: string) => {
       try {
         if (!u || u.startsWith("data:") || u.startsWith("blob:") || u.startsWith("javascript:") || u.startsWith("mailto:") || u.startsWith("#") || u.startsWith("//")) {
           return u;
@@ -67,8 +65,8 @@ serve(async (req) => {
       }
     };
 
-    html = html.replace(/(src|href)=["']((?![a-z]+:|\/|https?:\/\/|data:|blob:|#)([^"']*))["']/gi, (match, attr, path) => `${attr}="${rewriteUrl(path)}"`);
-    html = html.replace(/srcset=["']([^"']*)[ "']/gi, (match, srcset) => {
+    html = html.replace(/(src|href)=["']((?![a-z]+:|\/|https?:\/\/|data:|blob:|#)([^"']*))["']/gi, (match: string, attr: string, path: string) => `${attr}="${rewriteUrl(path)}"`);
+    html = html.replace(/srcset=["']([^"']*)[ "']/gi, (match: string, srcset: string) => {
       const rewritten = srcset.split(",").map((s) => {
         const parts = s.trim().split(/\s+/);
         if (parts.length >= 1) parts[0] = rewriteUrl(parts[0]);
@@ -87,9 +85,9 @@ serve(async (req) => {
       },
     });
   } catch (error) {
-    return new Response(JSON.stringify({ error: "Failed to fetch URL", details: error.message }), {
+    return new Response(JSON.stringify({ error: "Failed to fetch URL", details: (error as Error).message }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });
   }
-});
+}

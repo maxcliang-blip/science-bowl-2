@@ -19,7 +19,7 @@ import {
   Tab, Bookmark as BookmarkType, BookmarkFolder, ClosedTab, QuickLink,
   createNewTab, DEFAULT_QUICK_LINKS, FullHistoryEntry,
   SecuritySettings, DEFAULT_SECURITY_SETTINGS, TRACKER_BLOCKLIST, TrackerEntry, isTrackerDomain, 
-  RequestLogEntry, CookieEntry, StorageEntry, AD_BLOCKLIST, isAdDomain, FINGERPRINT_PROTECTION_SCRIPT
+  RequestLogEntry, CookieEntry, StorageEntry
 } from "./browser-types";
 
 const MAX_CLOSED_TABS = 20;

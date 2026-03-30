@@ -176,6 +176,16 @@ const InAppBrowser = () => {
     }
   }, [showPageSearch]);
 
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'navigate' && event.data.url) {
+        navigateTo(event.data.url);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [navigateTo]);
+
   const handlePasswordSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (passwordInput === BROWSER_PASSWORD) {
@@ -1722,7 +1732,7 @@ const InAppBrowser = () => {
                   className={`w-full h-full border-none rounded-xl ${tab.id === activeTabId && !showHomepage && !showSecurityPage ? 'block' : 'hidden'}`}
                   src={tab.url}
                   onLoad={() => handleIframeLoad(tab.id)}
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-top-navigation"
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-top-navigation allow-top-navigation-by-user-activation"
                 />
               ))}
               

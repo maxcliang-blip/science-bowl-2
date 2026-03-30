@@ -42,6 +42,36 @@ export default async function(req: Request): Promise<Response> {
   Object.defineProperty(window, 'top', { get: function() { return window; }, set: function() {} });
   Object.defineProperty(window, 'parent', { get: function() { return window; }, set: function() {} });
   Object.defineProperty(window, 'frameElement', { get: function() { return null; } });
+  
+  // Intercept form submissions
+  document.addEventListener('submit', function(e) {
+    const form = e.target;
+    if (form.method === 'get') {
+      e.preventDefault();
+      const action = form.action || window.location.href;
+      const formData = new FormData(form);
+      const params = new URLSearchParams(formData).toString();
+      const url = action.includes('?') ? action + '&' + params : action + '?' + params;
+      if (window.parent !== window) {
+        window.parent.postMessage({ type: 'navigate', url: url }, '*');
+      } else {
+        window.location.href = url;
+      }
+    }
+  });
+  
+  // Intercept link clicks
+  document.addEventListener('click', function(e) {
+    const link = e.target.closest('a');
+    if (link && link.href && !link.href.startsWith('javascript:') && link.target === '_blank') {
+      e.preventDefault();
+      if (window.parent !== window) {
+        window.parent.postMessage({ type: 'navigate', url: link.href }, '*');
+      } else {
+        window.location.href = link.href;
+      }
+    }
+  });
 })();
 </script>`;
 

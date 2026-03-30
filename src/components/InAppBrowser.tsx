@@ -7,7 +7,7 @@ import {
   Clock, Search, ZoomIn, ZoomOut, Eye, EyeOff, Sun, Moon,
   Camera, Download, ChevronRight, Shield, AlertTriangle,
   Upload, ShieldAlert, ShieldCheck, List, KeyRound, Eye as EyeIcon,
-  Link2, Link2Off
+  Link2, Link2Off, Cookie, FileText, Database, Activity, XCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -18,7 +18,8 @@ import { showSuccess, showError } from "@/utils/toast";
 import { 
   Tab, Bookmark as BookmarkType, BookmarkFolder, ClosedTab, QuickLink,
   createNewTab, DEFAULT_QUICK_LINKS, FullHistoryEntry,
-  SecuritySettings, DEFAULT_SECURITY_SETTINGS, TRACKER_BLOCKLIST, TrackerEntry, isTrackerDomain
+  SecuritySettings, DEFAULT_SECURITY_SETTINGS, TRACKER_BLOCKLIST, TrackerEntry, isTrackerDomain, 
+  RequestLogEntry, CookieEntry, StorageEntry, AD_BLOCKLIST, isAdDomain, FINGERPRINT_PROTECTION_SCRIPT
 } from "./browser-types";
 
 const MAX_CLOSED_TABS = 20;
@@ -78,6 +79,13 @@ const InAppBrowser = () => {
   const [passwordError, setPasswordError] = useState(false);
   
   const [useProxy, setUseProxy] = useState(true);
+  const [showRequestLogger, setShowRequestLogger] = useState(false);
+  const [requestLog, setRequestLog] = useState<RequestLogEntry[]>([]);
+  const [showCookieManager, setShowCookieManager] = useState(false);
+  const [cookies, setCookies] = useState<CookieEntry[]>([]);
+  const [showStorageManager, setShowStorageManager] = useState(false);
+  const [storageData, setStorageData] = useState<StorageEntry[]>([]);
+  const [blockedAdsToday, setBlockedAdsToday] = useState(0);
   
   const iframeRefs = useRef<Map<string, HTMLIFrameElement>>(new Map());
   const containerRef = useRef<HTMLDivElement>(null);
@@ -143,6 +151,21 @@ const InAppBrowser = () => {
     localStorage.setItem("browserBlockedTrackersDate", today);
     localStorage.setItem("browserBlockedTrackersToday", String(blockedTrackersToday));
   }, [blockedTrackersToday]);
+
+  useEffect(() => {
+    const savedBlockedAds = localStorage.getItem("browserBlockedAdsToday");
+    const today = new Date().toDateString();
+    const savedDate = localStorage.getItem("browserBlockedAdsDate");
+    if (savedDate === today && savedBlockedAds) {
+      setBlockedAdsToday(parseInt(savedBlockedAds, 10));
+    }
+  }, []);
+
+  useEffect(() => {
+    const today = new Date().toDateString();
+    localStorage.setItem("browserBlockedAdsDate", today);
+    localStorage.setItem("browserBlockedAdsToday", String(blockedAdsToday));
+  }, [blockedAdsToday]);
 
   useEffect(() => {
     if (securitySettings.clearHistoryOnClose) {
@@ -1234,19 +1257,46 @@ const InAppBrowser = () => {
                   onCheckedChange={(checked) => setSecuritySettings(prev => ({ ...prev, clearHistoryOnClose: checked }))}
                 />
               </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`font-medium ${darkMode ? "text-white" : "text-gray-700"}`}>Ad Blocking</p>
+                  <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Block known advertising domains</p>
+                </div>
+                <Switch 
+                  checked={securitySettings.adBlocking}
+                  onCheckedChange={(checked) => setSecuritySettings(prev => ({ ...prev, adBlocking: checked }))}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`font-medium ${darkMode ? "text-white" : "text-gray-700"}`}>Fingerprinting Protection</p>
+                  <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Block canvas, WebGL, and audio fingerprinting</p>
+                </div>
+                <Switch 
+                  checked={securitySettings.fingerprintProtection}
+                  onCheckedChange={(checked) => setSecuritySettings(prev => ({ ...prev, fingerprintProtection: checked }))}
+                />
+              </div>
             </div>
           </div>
 
           <div className={`rounded-xl p-6 mb-6 ${darkMode ? "bg-gray-700" : "bg-white shadow-sm"}`}>
             <h2 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${darkMode ? "text-white" : "text-gray-800"}`}>
               <ShieldAlert size={20} className="text-orange-500" />
-              Tracker Protection
+              Protection Stats
             </h2>
             
-            <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
-              <p className={`text-sm ${darkMode ? "text-blue-300" : "text-blue-700"}`}>
-                <strong>Trackers blocked today:</strong> {blockedTrackersToday}
-              </p>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+                <p className={`text-2xl font-bold ${darkMode ? "text-blue-300" : "text-blue-700"}`}>{blockedTrackersToday}</p>
+                <p className={`text-sm ${darkMode ? "text-blue-400" : "text-blue-600"}`}>Trackers blocked</p>
+              </div>
+              <div className="p-4 bg-red-50 dark:bg-red-900/30 rounded-lg">
+                <p className={`text-2xl font-bold ${darkMode ? "text-red-300" : "text-red-700"}`}>{blockedAdsToday}</p>
+                <p className={`text-sm ${darkMode ? "text-red-400" : "text-red-600"}`}>Ads blocked</p>
+              </div>
             </div>
             
             <div className="flex items-center justify-between mb-4">
@@ -1277,6 +1327,120 @@ const InAppBrowser = () => {
                 Add
               </Button>
             </div>
+          </div>
+
+          <div className={`rounded-xl p-6 mb-6 ${darkMode ? "bg-gray-700" : "bg-white shadow-sm"}`}>
+            <h2 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${darkMode ? "text-white" : "text-gray-800"}`}>
+              <Activity size={20} className="text-purple-500" />
+              Request Logger
+            </h2>
+            <Button variant="outline" onClick={() => {
+              setShowRequestLogger(!showRequestLogger);
+              if (!showRequestLogger) setRequestLog([]);
+            }} className="w-full mb-4">
+              {showRequestLogger ? "Hide Request Logger" : "Show Request Logger"}
+            </Button>
+            {showRequestLogger && (
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {requestLog.length === 0 ? (
+                  <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>No requests logged yet. Visit a page to see requests.</p>
+                ) : (
+                  requestLog.slice(-20).reverse().map((req) => (
+                    <div key={req.id} className={`p-2 rounded text-xs ${req.blocked ? "bg-red-100 dark:bg-red-900/30" : darkMode ? "bg-gray-600" : "bg-gray-100"}`}>
+                      <div className="flex items-center gap-2">
+                        {req.blocked && <XCircle size={12} className="text-red-500" />}
+                        <span className={`font-mono ${darkMode ? "text-gray-300" : "text-gray-700"}`}>{req.method}</span>
+                        <span className={darkMode ? "text-gray-400" : "text-gray-500"}>{new URL(req.url).hostname}</span>
+                        <span className={`ml-auto ${req.status >= 400 ? "text-red-500" : "text-green-500"}`}>{req.status || "blocked"}</span>
+                      </div>
+                      <p className={`truncate ${darkMode ? "text-gray-500" : "text-gray-400"}`}>{req.url}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className={`rounded-xl p-6 mb-6 ${darkMode ? "bg-gray-700" : "bg-white shadow-sm"}`}>
+            <h2 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${darkMode ? "text-white" : "text-gray-800"}`}>
+              <Cookie size={20} className="text-yellow-500" />
+              Cookie Manager
+            </h2>
+            <Button variant="outline" onClick={() => {
+              setShowCookieManager(!showCookieManager);
+              if (!showCookieManager) {
+                setCookies([]);
+              }
+            }} className="w-full mb-4">
+              {showCookieManager ? "Hide Cookie Manager" : "Show Cookie Manager"}
+            </Button>
+            {showCookieManager && (
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {cookies.length === 0 ? (
+                  <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>No cookies stored for current site.</p>
+                ) : (
+                  cookies.map((cookie, idx) => (
+                    <div key={idx} className={`p-2 rounded text-xs ${darkMode ? "bg-gray-600" : "bg-gray-100"}`}>
+                      <p className={`font-medium ${darkMode ? "text-white" : "text-gray-700"}`}>{cookie.name}</p>
+                      <p className={`truncate ${darkMode ? "text-gray-400" : "text-gray-500"}`}>{cookie.value.substring(0, 50)}...</p>
+                      <div className="flex gap-2 mt-1">
+                        {cookie.secure && <span className="text-xs text-green-500">Secure</span>}
+                        {cookie.httpOnly && <span className="text-xs text-blue-500">HTTPOnly</span>}
+                      </div>
+                    </div>
+                  ))
+                )}
+                {cookies.length > 0 && (
+                  <Button variant="destructive" size="sm" className="w-full mt-2" onClick={() => {
+                    setCookies([]);
+                    showSuccess("Cookies cleared");
+                  }}>
+                    Clear All Cookies
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className={`rounded-xl p-6 mb-6 ${darkMode ? "bg-gray-700" : "bg-white shadow-sm"}`}>
+            <h2 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${darkMode ? "text-white" : "text-gray-800"}`}>
+              <Database size={20} className="text-green-500" />
+              Storage Manager
+            </h2>
+            <Button variant="outline" onClick={() => {
+              setShowStorageManager(!showStorageManager);
+              if (!showStorageManager) {
+                setStorageData([]);
+              }
+            }} className="w-full mb-4">
+              {showStorageManager ? "Hide Storage Manager" : "Show Storage Manager"}
+            </Button>
+            {showStorageManager && (
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {storageData.length === 0 ? (
+                  <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>No storage data for current site.</p>
+                ) : (
+                  storageData.map((item, idx) => (
+                    <div key={idx} className={`p-2 rounded text-xs ${darkMode ? "bg-gray-600" : "bg-gray-100"}`}>
+                      <div className="flex items-center justify-between">
+                        <p className={`font-medium ${darkMode ? "text-white" : "text-gray-700"}`}>{item.key}</p>
+                        <span className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-500"}`}>{(item.size / 1024).toFixed(2)} KB</span>
+                      </div>
+                      <p className={`truncate ${darkMode ? "text-gray-400" : "text-gray-500"}`}>{item.value.substring(0, 100)}...</p>
+                      <span className={`text-xs ${darkMode ? "text-blue-400" : "text-blue-600"}`}>{item.type}</span>
+                    </div>
+                  ))
+                )}
+                {storageData.length > 0 && (
+                  <Button variant="destructive" size="sm" className="w-full mt-2" onClick={() => {
+                    setStorageData([]);
+                    showSuccess("Storage cleared");
+                  }}>
+                    Clear All Storage
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
 
           <div className={`rounded-xl p-6 mb-6 ${darkMode ? "bg-gray-700" : "bg-white shadow-sm"}`}>

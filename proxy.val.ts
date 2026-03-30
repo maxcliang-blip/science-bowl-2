@@ -43,6 +43,38 @@ export default async function(req: Request): Promise<Response> {
   Object.defineProperty(window, 'parent', { get: function() { return window; }, set: function() {} });
   Object.defineProperty(window, 'frameElement', { get: function() { return null; } });
   
+  // Canvas fingerprint protection
+  const origToDataURL = HTMLCanvasElement.prototype.toDataURL;
+  HTMLCanvasElement.prototype.toDataURL = function() {
+    const ctx = this.getContext('2d');
+    if (ctx) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, this.width, this.height); }
+    return origToDataURL.apply(this, arguments);
+  };
+  
+  // WebGL fingerprint protection
+  const origGetParameter = WebGLRenderingContext.prototype.getParameter;
+  WebGLRenderingContext.prototype.getParameter = function(param) {
+    if (param === 37445 || param === 37446) return 'Intel Inc.';
+    return origGetParameter.apply(this, arguments);
+  };
+  
+  // Audio fingerprint protection
+  const origGetFloat = AnalyserNode.prototype.getFloatFrequencyData;
+  AnalyserNode.prototype.getFloatFrequencyData = function(arr) {
+    origGetFloat.call(this, arr);
+    for (let i = 0; i < arr.length; i++) arr[i] = -100;
+    return arr;
+  };
+  
+  // Navigator properties
+  Object.defineProperty(navigator, 'plugins', { get: function() { return []; } });
+  Object.defineProperty(navigator, 'languages', { get: function() { return ['en-US', 'en']; } });
+  Object.defineProperty(navigator, 'platform', { get: function() { return 'Win32'; } });
+  
+  // Screen properties
+  Object.defineProperty(screen, 'colorDepth', { get: function() { return 24; } });
+  Object.defineProperty(screen, 'pixelDepth', { get: function() { return 24; } });
+  
   // Intercept form submissions
   document.addEventListener('submit', function(e) {
     const form = e.target;
@@ -51,11 +83,11 @@ export default async function(req: Request): Promise<Response> {
       const action = form.action || window.location.href;
       const formData = new FormData(form);
       const params = new URLSearchParams(formData).toString();
-      const url = action.includes('?') ? action + '&' + params : action + '?' + params;
+      const navUrl = action.includes('?') ? action + '&' + params : action + '?' + params;
       if (window.parent !== window) {
-        window.parent.postMessage({ type: 'navigate', url: url }, '*');
+        window.parent.postMessage({ type: 'navigate', url: navUrl }, '*');
       } else {
-        window.location.href = url;
+        window.location.href = navUrl;
       }
     }
   });

@@ -46,8 +46,37 @@ export interface FullHistoryEntry {
 
 export interface SecuritySettings {
   trackerBlocking: boolean;
+  adBlocking: boolean;
   httpWarning: boolean;
   clearHistoryOnClose: boolean;
+  fingerprintProtection: boolean;
+}
+
+export interface CookieEntry {
+  name: string;
+  value: string;
+  domain: string;
+  path: string;
+  expires: string;
+  httpOnly: boolean;
+  secure: boolean;
+}
+
+export interface RequestLogEntry {
+  id: string;
+  url: string;
+  method: string;
+  status: number;
+  type: string;
+  blocked: boolean;
+  timestamp: number;
+}
+
+export interface StorageEntry {
+  key: string;
+  value: string;
+  type: 'localStorage' | 'sessionStorage' | 'cookie';
+  size: number;
 }
 
 export interface TrackerEntry {
@@ -58,8 +87,10 @@ export interface TrackerEntry {
 
 export const DEFAULT_SECURITY_SETTINGS: SecuritySettings = {
   trackerBlocking: true,
+  adBlocking: true,
   httpWarning: true,
   clearHistoryOnClose: false,
+  fingerprintProtection: true,
 };
 
 export const TRACKER_BLOCKLIST: TrackerEntry[] = [
@@ -148,3 +179,110 @@ export const isTrackerDomain = (url: string, customBlocklist?: string[]): boolea
     return false;
   }
 };
+
+export const AD_BLOCKLIST: string[] = [
+  "doubleclick.net",
+  "googlesyndication.com",
+  "googleadservices.com",
+  "googleads.g.doubleclick.net",
+  "ads.google.com",
+  "adservice.google.com",
+  "pagead2.googlesyndication.com",
+  "adnxs.com",
+  "adsrvr.org",
+  "criteo.com",
+  "criteo.net",
+  "taboola.com",
+  "outbrain.com",
+  "moatads.com",
+  "quantserve.com",
+  "adcolony.com",
+  "admob.com",
+  "adsense.com",
+  "advertising.com",
+  "bidswitch.net",
+  "casalemedia.com",
+  "rubiconproject.com",
+  "pubmatic.com",
+  "openx.net",
+  "33across.com",
+  "adform.net",
+  "bidswitch.net",
+  "contextweb.com",
+  "districtm.io",
+  "gumgum.com",
+  "indexww.com",
+  "lijit.com",
+  "media.net",
+  "mgid.com",
+  "outbrain.com",
+  "revcontent.com",
+  "sharethrough.com",
+  "smartadserver.com",
+  "sovrn.com",
+  "spotxchange.com",
+  "stickyadstv.com",
+  "teads.tv",
+  "triplelift.com",
+  "undertone.com",
+  "yahoo.com",
+  "yieldmo.com",
+  "zedo.com",
+  "ad.doubleclick.net",
+  "securepubads.g.doubleclick.net",
+  "adclick.g.doubleclick.net",
+  "adevents.googleapis.com",
+];
+
+export const isAdDomain = (url: string): boolean => {
+  try {
+    const parsedUrl = new URL(url);
+    const hostname = parsedUrl.hostname.toLowerCase();
+    return AD_BLOCKLIST.some(ad => hostname.includes(ad));
+  } catch {
+    return false;
+  }
+};
+
+export const FINGERPRINT_PROTECTION_SCRIPT = `
+(function() {
+  // Canvas fingerprint protection
+  const originalToDataURL = HTMLCanvasElement.prototype.toDataURL;
+  HTMLCanvasElement.prototype.toDataURL = function() {
+    const ctx = this.getContext('2d');
+    if (ctx) {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, this.width, this.height);
+    }
+    return originalToDataURL.apply(this, arguments);
+  };
+  
+  // WebGL fingerprint protection  
+  const getParameter = WebGLRenderingContext.prototype.getParameter;
+  WebGLRenderingContext.prototype.getParameter = function(param) {
+    if (param === 37445 || param === 37446) {
+      return 'Intel Inc.';
+    }
+    return getParameter.apply(this, arguments);
+  };
+  
+  // Audio fingerprint protection
+  const analyserGetFloatFrequencyData = AnalyserNode.prototype.getFloatFrequencyData;
+  AnalyserNode.prototype.getFloatFrequencyData = function(array) {
+    analyserGetFloatFrequencyData.call(this, array);
+    for (let i = 0; i < array.length; i++) {
+      array[i] = -100;
+    }
+    return array;
+  };
+  
+  // Navigator properties
+  Object.defineProperty(navigator, 'plugins', { get: function() { return []; } });
+  Object.defineProperty(navigator, 'languages', { get: function() { return ['en-US', 'en']; } });
+  Object.defineProperty(navigator, 'platform', { get: function() { return 'Win32'; } });
+  
+  // Screen properties
+  Object.defineProperty(screen, 'colorDepth', { get: function() { return 24; } });
+  Object.defineProperty(screen, 'pixelDepth', { get: function() { return 24; } });
+})();
+`;

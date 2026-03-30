@@ -1722,7 +1722,7 @@ const InAppBrowser = () => {
                   className={`w-full h-full border-none rounded-xl ${tab.id === activeTabId && !showHomepage && !showSecurityPage ? 'block' : 'hidden'}`}
                   src={tab.url}
                   onLoad={() => handleIframeLoad(tab.id)}
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-top-navigation"
                 />
               ))}
               

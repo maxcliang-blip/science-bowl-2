@@ -202,12 +202,42 @@ const InAppBrowser = () => {
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'navigate' && event.data.url) {
-        navigateTo(event.data.url);
+        const newUrl = event.data.url;
+        if (newUrl.startsWith("lax://")) return;
+        if (!newUrl.startsWith("http://") && !newUrl.startsWith("https://")) return;
+        
+        setShowSecurityPage(false);
+        setShowHomepage(false);
+        
+        setTabs(prev => prev.map(tab => {
+          if (tab.id === activeTabId) {
+            const newHistory = tab.history.slice(0, tab.historyIndex + 1);
+            if (newHistory[newHistory.length - 1] !== newUrl) {
+              newHistory.push(newUrl);
+              if (newHistory.length > MAX_HISTORY) newHistory.shift();
+            }
+            return {
+              ...tab,
+              url: newUrl,
+              title: new URL(newUrl).hostname,
+              favicon: `https://www.google.com/s2/favicons?domain=${new URL(newUrl).hostname}&sz=32`,
+              loading: true,
+              history: newHistory,
+              historyIndex: newHistory.length - 1,
+            };
+          }
+          return tab;
+        }));
+        
+        if (iframeRefs.current.has(activeTabId)) {
+          const iframeUrl = `${PROXY_URL}${encodeURIComponent(newUrl)}`;
+          iframeRefs.current.get(activeTabId)!.src = iframeUrl;
+        }
       }
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [navigateTo]);
+  }, [activeTabId, showSecurityPage, showHomepage]);
 
   const handlePasswordSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();

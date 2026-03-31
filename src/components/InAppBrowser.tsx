@@ -7,7 +7,8 @@ import {
   Clock, Search, ZoomIn, ZoomOut, Eye, EyeOff, Sun, Moon,
   Camera, Download, ChevronRight, Shield, AlertTriangle,
   Upload, ShieldAlert, ShieldCheck, List, KeyRound, Eye as EyeIcon,
-  Link2, Link2Off, Cookie, FileText, Database, Activity, XCircle
+  Link2, Link2Off, Cookie, FileText, Database, Activity, XCircle,
+  ExternalLink
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -900,6 +901,18 @@ const InAppBrowser = () => {
             title="Home"
           >
             <Home size={18} />
+          </button>
+          <button
+            onClick={() => {
+              if (activeTab && !activeTab.url.startsWith("about:") && !activeTab.url.startsWith("lax://")) {
+                window.open(activeTab.url, '_blank');
+              }
+            }}
+            className={`p-2 rounded-full ${darkMode ? "hover:bg-gray-700 text-white" : "hover:bg-gray-200 text-gray-700"}`}
+            title="Open in new tab"
+            disabled={!activeTab || activeTab.url.startsWith("about:") || activeTab.url.startsWith("lax://")}
+          >
+            <ExternalLink size={18} />
           </button>
           
           <Popover open={showBookmarks} onOpenChange={setShowBookmarks}>

@@ -237,7 +237,50 @@ const InAppBrowser = () => {
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [activeTabId, showSecurityPage, showHomepage]);
+  }, [activeTabId, showSecurityPage, showHomepage, tabs]);
+
+  useEffect(() => {
+    if (showSecurityPage || showHomepage) return;
+    
+    const checkIframeUrl = () => {
+      const iframe = iframeRefs.current.get(activeTabId);
+      if (!iframe || !iframe.contentWindow) return;
+      
+      try {
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (iframeDoc && iframeDoc.location && iframeDoc.location.href) {
+          const currentIframeUrl = iframeDoc.location.href;
+          const currentTab = tabs.find(t => t.id === activeTabId);
+          if (currentTab && currentIframeUrl !== currentTab.url && !currentIframeUrl.includes('about:')) {
+            setTabs(prev => prev.map(tab => {
+              if (tab.id === activeTabId) {
+                const newHistory = tab.history.slice(0, tab.historyIndex + 1);
+                if (newHistory[newHistory.length - 1] !== currentIframeUrl) {
+                  newHistory.push(currentIframeUrl);
+                  if (newHistory.length > MAX_HISTORY) newHistory.shift();
+                }
+                return {
+                  ...tab,
+                  url: currentIframeUrl,
+                  title: new URL(currentIframeUrl).hostname,
+                  favicon: `https://www.google.com/s2/favicons?domain=${new URL(currentIframeUrl).hostname}&sz=32`,
+                  loading: false,
+                  history: newHistory,
+                  historyIndex: newHistory.length - 1,
+                };
+              }
+              return tab;
+            }));
+          }
+        }
+      } catch {
+        // Cross-origin access denied - ignore
+      }
+    };
+    
+    const interval = setInterval(checkIframeUrl, 1000);
+    return () => clearInterval(interval);
+  }, [activeTabId, showSecurityPage, showHomepage, tabs]);
 
   const handlePasswordSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();

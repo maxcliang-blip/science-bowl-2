@@ -39,41 +39,39 @@ export default async function(req: Request): Promise<Response> {
     const proxyScripts = `<script>
 (function() {
   'use strict';
-  Object.defineProperty(window, 'top', { get: function() { return window; }, set: function() {} });
-  Object.defineProperty(window, 'parent', { get: function() { return window; }, set: function() {} });
-  Object.defineProperty(window, 'frameElement', { get: function() { return null; } });
   
-  // Canvas fingerprint protection
-  const origToDataURL = HTMLCanvasElement.prototype.toDataURL;
-  HTMLCanvasElement.prototype.toDataURL = function() {
-    const ctx = this.getContext('2d');
-    if (ctx) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, this.width, this.height); }
-    return origToDataURL.apply(this, arguments);
-  };
+  // Store original location
+  const originalLocation = window.location.href;
   
-  // WebGL fingerprint protection
-  const origGetParameter = WebGLRenderingContext.prototype.getParameter;
-  WebGLRenderingContext.prototype.getParameter = function(param) {
-    if (param === 37445 || param === 37446) return 'Intel Inc.';
-    return origGetParameter.apply(this, arguments);
-  };
+  // Intercept redirects
+  Object.defineProperty(window, 'location', {
+    get: function() {
+      return new Proxy(window._location, {
+        get: function(target, prop) {
+          if (prop === 'href') {
+            const newHref = window._location.href;
+            if (newHref !== originalLocation && window.parent !== window) {
+              window.parent.postMessage({ type: 'navigate', url: newHref }, '*');
+            }
+            return newHref;
+          }
+          return target[prop];
+        },
+        set: function(target, prop, value) {
+          if (prop === 'href' && window.parent !== window) {
+            window.parent.postMessage({ type: 'navigate', url: value }, '*');
+            return true;
+          }
+          target[prop] = value;
+          return true;
+        }
+      });
+    },
+    set: function(val) { window._location = val; }
+  });
   
-  // Audio fingerprint protection
-  const origGetFloat = AnalyserNode.prototype.getFloatFrequencyData;
-  AnalyserNode.prototype.getFloatFrequencyData = function(arr) {
-    origGetFloat.call(this, arr);
-    for (let i = 0; i < arr.length; i++) arr[i] = -100;
-    return arr;
-  };
-  
-  // Navigator properties
-  Object.defineProperty(navigator, 'plugins', { get: function() { return []; } });
-  Object.defineProperty(navigator, 'languages', { get: function() { return ['en-US', 'en']; } });
-  Object.defineProperty(navigator, 'platform', { get: function() { return 'Win32'; } });
-  
-  // Screen properties
-  Object.defineProperty(screen, 'colorDepth', { get: function() { return 24; } });
-  Object.defineProperty(screen, 'pixelDepth', { get: function() { return 24; } });
+  // Store original location
+  window._location = { ...window.location };
   
   // Intercept form submissions
   document.addEventListener('submit', function(e) {
@@ -95,12 +93,10 @@ export default async function(req: Request): Promise<Response> {
   // Intercept link clicks
   document.addEventListener('click', function(e) {
     const link = e.target.closest('a');
-    if (link && link.href && !link.href.startsWith('javascript:') && link.target === '_blank') {
-      e.preventDefault();
+    if (link && link.href && !link.href.startsWith('javascript:')) {
       if (window.parent !== window) {
+        e.preventDefault();
         window.parent.postMessage({ type: 'navigate', url: link.href }, '*');
-      } else {
-        window.location.href = link.href;
       }
     }
   });

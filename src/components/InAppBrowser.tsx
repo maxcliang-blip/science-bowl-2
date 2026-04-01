@@ -20,7 +20,7 @@ import {
   Tab, Bookmark as BookmarkType, BookmarkFolder, ClosedTab, QuickLink,
   createNewTab, DEFAULT_QUICK_LINKS, FullHistoryEntry,
   SecuritySettings, DEFAULT_SECURITY_SETTINGS, TRACKER_BLOCKLIST, TrackerEntry, isTrackerDomain, 
-  RequestLogEntry, CookieEntry, StorageEntry
+  RequestLogEntry, CookieEntry, StorageEntry, AuditLogEntry, LoginAttempt
 } from "./browser-types";
 
 const MAX_CLOSED_TABS = 20;
@@ -87,6 +87,12 @@ const InAppBrowser = () => {
   const [showStorageManager, setShowStorageManager] = useState(false);
   const [storageData, setStorageData] = useState<StorageEntry[]>([]);
   const [blockedAdsToday, setBlockedAdsToday] = useState(0);
+  const [loginAttempts, setLoginAttempts] = useState<LoginAttempt[]>([]);
+  const [isLockedOut, setIsLockedOut] = useState(false);
+  const [lockoutEndTime, setLockoutEndTime] = useState<number | null>(null);
+  const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
+  const [showAuditLog, setShowAuditLog] = useState(false);
+  const [lastActivity, setLastActivity] = useState<number>(Date.now());
   
   const iframeRefs = useRef<Map<string, HTMLIFrameElement>>(new Map());
   const containerRef = useRef<HTMLDivElement>(null);
@@ -121,6 +127,25 @@ const InAppBrowser = () => {
     const savedDate = localStorage.getItem("browserBlockedTrackersDate");
     if (savedDate === today && savedBlockedCount) {
       setBlockedTrackersToday(parseInt(savedBlockedCount, 10));
+    }
+
+    const savedLoginAttempts = localStorage.getItem("browserLoginAttempts");
+    if (savedLoginAttempts) {
+      const attempts = JSON.parse(savedLoginAttempts);
+      const todayAttempts = attempts.filter((a: LoginAttempt) => new Date(a.timestamp).toDateString() === today);
+      setLoginAttempts(todayAttempts);
+      const failedToday = todayAttempts.filter((a: LoginAttempt) => !a.success).length;
+      if (failedToday >= DEFAULT_SECURITY_SETTINGS.loginAttemptLimit) {
+        setIsLockedOut(true);
+        setLockoutEndTime(Date.now() + 300000);
+      }
+    }
+    
+    const savedAuditLog = localStorage.getItem("browserAuditLog");
+    if (savedAuditLog) {
+      const log = JSON.parse(savedAuditLog);
+      const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      setAuditLog(log.filter((e: AuditLogEntry) => e.timestamp > weekAgo));
     }
   }, []);
 
@@ -167,6 +192,40 @@ const InAppBrowser = () => {
     localStorage.setItem("browserBlockedAdsDate", today);
     localStorage.setItem("browserBlockedAdsToday", String(blockedAdsToday));
   }, [blockedAdsToday]);
+
+  useEffect(() => {
+    const today = new Date().toDateString();
+    const todayAttempts = loginAttempts.filter(a => new Date(a.timestamp).toDateString() === today);
+    localStorage.setItem("browserLoginAttempts", JSON.stringify(todayAttempts));
+  }, [loginAttempts]);
+
+  useEffect(() => {
+    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const recentLog = auditLog.filter(e => e.timestamp > weekAgo);
+    localStorage.setItem("browserAuditLog", JSON.stringify(recentLog));
+  }, [auditLog]);
+
+  useEffect(() => {
+    if (isLockedOut && lockoutEndTime) {
+      const timeout = setTimeout(() => {
+        setIsLockedOut(false);
+        setLockoutEndTime(null);
+        addAuditLogEntry('security', 'Lockout ended', 'Automatic unlock after timeout', 'info');
+      }, lockoutEndTime - Date.now());
+      return () => clearTimeout(timeout);
+    }
+  }, [isLockedOut, lockoutEndTime]);
+
+  const addAuditLogEntry = useCallback((event: string, details: string, severity: AuditLogEntry['severity'] = 'info') => {
+    const entry: AuditLogEntry = {
+      id: crypto.randomUUID(),
+      timestamp: Date.now(),
+      event,
+      details,
+      severity
+    };
+    setAuditLog(prev => [entry, ...prev].slice(0, 1000));
+  }, []);
 
   useEffect(() => {
     if (securitySettings.clearHistoryOnClose) {
@@ -283,26 +342,82 @@ const InAppBrowser = () => {
     return () => clearInterval(interval);
   }, [activeTabId, showSecurityPage, showHomepage, tabs]);
 
+  useEffect(() => {
+    if (!isLocked || securitySettings.sessionTimeout <= 0) return;
+    
+    const checkInactivity = () => {
+      const now = Date.now();
+      const timeout = securitySettings.sessionTimeout * 60 * 1000;
+      if (now - lastActivity > timeout) {
+        setIsLocked(true);
+        setShowHomepage(true);
+        setShowSecurityPage(false);
+        addAuditLogEntry('security', 'Session timeout', 'Browser locked due to inactivity', 'warning');
+        showError('Session timed out due to inactivity');
+      }
+    };
+    
+    const interval = setInterval(checkInactivity, 30000);
+    return () => clearInterval(interval);
+  }, [isLocked, lastActivity, securitySettings.sessionTimeout]);
+
+  useEffect(() => {
+    const updateActivity = () => setLastActivity(Date.now());
+    window.addEventListener('mousemove', updateActivity);
+    window.addEventListener('keydown', updateActivity);
+    window.addEventListener('click', updateActivity);
+    return () => {
+      window.removeEventListener('mousemove', updateActivity);
+      window.removeEventListener('keydown', updateActivity);
+      window.removeEventListener('click', updateActivity);
+    };
+  }, []);
+
   const handlePasswordSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (isLockedOut) {
+      const remaining = Math.ceil((lockoutEndTime! - Date.now()) / 1000 / 60);
+      showError(`Too many failed attempts. Try again in ${remaining} minutes.`);
+      return;
+    }
+    
     if (passwordInput === BROWSER_PASSWORD) {
       setIsLocked(false);
       setPasswordError(false);
       setPasswordInput("");
+      setLastActivity(Date.now());
+      const attempt: LoginAttempt = { timestamp: Date.now(), success: true };
+      setLoginAttempts(prev => [...prev, attempt]);
+      addAuditLogEntry('auth', 'Login success', 'Browser unlocked successfully', 'info');
       showSuccess("Browser unlocked");
     } else {
       setPasswordError(true);
       setPasswordInput("");
-      showError("Incorrect password");
+      const attempt: LoginAttempt = { timestamp: Date.now(), success: false };
+      const newAttempts = [...loginAttempts, attempt];
+      setLoginAttempts(newAttempts);
+      addAuditLogEntry('auth', 'Login failed', 'Incorrect password attempt', 'warning');
+      
+      const failedToday = newAttempts.filter(a => !a.success && new Date(a.timestamp).toDateString() === new Date().toDateString()).length;
+      if (failedToday >= securitySettings.loginAttemptLimit) {
+        setIsLockedOut(true);
+        setLockoutEndTime(Date.now() + 300000);
+        addAuditLogEntry('security', `Too many failed attempts (${failedToday})`, 'critical');
+        showError("Too many failed attempts. Locked for 5 minutes.");
+      } else {
+        showError(`Incorrect password. ${securitySettings.loginAttemptLimit - failedToday} attempts remaining.`);
+      }
     }
-  }, [passwordInput]);
+  }, [passwordInput, isLockedOut, lockoutEndTime, loginAttempts, securitySettings.loginAttemptLimit, addAuditLogEntry]);
 
   const lockBrowser = useCallback(() => {
     setIsLocked(true);
     setShowHomepage(true);
     setShowSecurityPage(false);
+    addAuditLogEntry('auth', 'Browser locked', 'User initiated lock', 'info');
     showSuccess("Browser locked");
-  }, []);
+  }, [addAuditLogEntry]);
 
   const exportBookmarks = useCallback(() => {
     const data = {
@@ -1365,6 +1480,49 @@ const InAppBrowser = () => {
                   onCheckedChange={(checked) => setSecuritySettings(prev => ({ ...prev, fingerprintProtection: checked }))}
                 />
               </div>
+
+              <div className="flex items-center justify-between mt-4">
+                <div>
+                  <p className={`font-medium ${darkMode ? "text-white" : "text-gray-700"}`}>DNS over HTTPS</p>
+                  <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Encrypt DNS queries for privacy</p>
+                </div>
+                <Switch 
+                  checked={securitySettings.dnsOverHttps}
+                  onCheckedChange={(checked) => setSecuritySettings(prev => ({ ...prev, dnsOverHttps: checked }))}
+                />
+              </div>
+
+              <div className="mt-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className={`font-medium ${darkMode ? "text-white" : "text-gray-700"}`}>Login Attempt Limit</p>
+                  <span className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>{securitySettings.loginAttemptLimit} attempts</span>
+                </div>
+                <Input
+                  type="range"
+                  min="3"
+                  max="10"
+                  value={securitySettings.loginAttemptLimit}
+                  onChange={(e) => setSecuritySettings(prev => ({ ...prev, loginAttemptLimit: parseInt(e.target.value) }))}
+                  className="w-full"
+                />
+              </div>
+
+              <div className="mt-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className={`font-medium ${darkMode ? "text-white" : "text-gray-700"}`}>Session Timeout</p>
+                  <span className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>{securitySettings.sessionTimeout} min</span>
+                </div>
+                <Input
+                  type="range"
+                  min="0"
+                  max="60"
+                  step="5"
+                  value={securitySettings.sessionTimeout}
+                  onChange={(e) => setSecuritySettings(prev => ({ ...prev, sessionTimeout: parseInt(e.target.value) }))}
+                  className="w-full"
+                />
+                <p className={`text-xs ${darkMode ? "text-gray-500" : "text-gray-400"}`}>0 = disabled</p>
+              </div>
             </div>
           </div>
 
@@ -1524,6 +1682,55 @@ const InAppBrowser = () => {
                   }}>
                     Clear All Storage
                   </Button>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className={`rounded-xl p-6 mb-6 ${darkMode ? "bg-gray-700" : "bg-white shadow-sm"}`}>
+            <h2 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${darkMode ? "text-white" : "text-gray-800"}`}>
+              <FileText size={20} className="text-cyan-500" />
+              Audit Log
+            </h2>
+            <div className="flex gap-4 mb-4">
+              <Button variant="outline" onClick={() => setShowAuditLog(!showAuditLog)} className="flex-1">
+                {showAuditLog ? "Hide Audit Log" : "Show Audit Log"}
+              </Button>
+              {auditLog.length > 0 && (
+                <Button variant="destructive" size="sm" onClick={() => {
+                  setAuditLog([]);
+                  showSuccess("Audit log cleared");
+                }}>
+                  Clear Log
+                </Button>
+              )}
+            </div>
+            {showAuditLog && (
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {auditLog.length === 0 ? (
+                  <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>No security events logged.</p>
+                ) : (
+                  auditLog.map((entry) => (
+                    <div key={entry.id} className={`p-3 rounded text-xs ${
+                      entry.severity === 'critical' ? 'bg-red-100 dark:bg-red-900/30 border border-red-500' :
+                      entry.severity === 'error' ? 'bg-red-50 dark:bg-red-900/20' :
+                      entry.severity === 'warning' ? 'bg-yellow-50 dark:bg-yellow-900/20' :
+                      darkMode ? 'bg-gray-600' : 'bg-gray-100'
+                    }`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className={`font-medium ${
+                          entry.severity === 'critical' ? 'text-red-600 dark:text-red-400' :
+                          entry.severity === 'error' ? 'text-red-500' :
+                          entry.severity === 'warning' ? 'text-yellow-600 dark:text-yellow-400' :
+                          darkMode ? 'text-blue-400' : 'text-blue-600'
+                        }`}>{entry.event}</span>
+                        <span className={`text-xs ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
+                          {new Date(entry.timestamp).toLocaleString()}
+                        </span>
+                      </div>
+                      <p className={darkMode ? "text-gray-300" : "text-gray-600"}>{entry.details}</p>
+                    </div>
+                  ))
                 )}
               </div>
             )}

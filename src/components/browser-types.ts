@@ -50,6 +50,23 @@ export interface SecuritySettings {
   httpWarning: boolean;
   clearHistoryOnClose: boolean;
   fingerprintProtection: boolean;
+  loginAttemptLimit: number;
+  sessionTimeout: number;
+  dnsOverHttps: boolean;
+}
+
+export interface LoginAttempt {
+  timestamp: number;
+  success: boolean;
+  ip?: string;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  timestamp: number;
+  event: string;
+  details: string;
+  severity: 'info' | 'warning' | 'error' | 'critical';
 }
 
 export interface CookieEntry {
@@ -91,6 +108,9 @@ export const DEFAULT_SECURITY_SETTINGS: SecuritySettings = {
   httpWarning: true,
   clearHistoryOnClose: false,
   fingerprintProtection: true,
+  loginAttemptLimit: 5,
+  sessionTimeout: 15,
+  dnsOverHttps: true,
 };
 
 export const TRACKER_BLOCKLIST: TrackerEntry[] = [

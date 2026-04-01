@@ -1,0 +1,10 @@
+{
+  "$schema": "https://opencode.ai",
+  "command": {
+    "secure": {
+      "description": "Run Snyk scan and fix vulnerabilities",
+      "agent": "plan",
+      "template": "I am running a Snyk security scan. Here are the results: !`snyk code test`. \n\nReview these vulnerabilities, explain the risks, and provide the exact code changes needed to fix them. Focus on high-severity issues first.",
+    }
+  }
+}

@@ -3,7 +3,7 @@
   "autoupdate": true,
   "permission": {
     "edit": "allow",
-    "bash": "ask",
+    "bash": "allow",
     "webfetch": "allow",
     "read": "allow"
   },

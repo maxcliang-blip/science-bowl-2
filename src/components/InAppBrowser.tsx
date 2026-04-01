@@ -318,9 +318,29 @@ const InAppBrowser = () => {
       try {
         const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
         if (iframeDoc && iframeDoc.location && iframeDoc.location.href) {
-          const currentIframeUrl = iframeDoc.location.href;
+          let currentIframeUrl = iframeDoc.location.href;
           const currentTab = tabs.find(t => t.id === activeTabId);
-          if (currentTab && currentIframeUrl !== currentTab.url && !currentIframeUrl.includes('about:')) {
+          if (!currentTab) return;
+          
+          if (currentIframeUrl !== currentTab.url && !currentIframeUrl.includes('about:')) {
+            if (currentIframeUrl.includes('type') && currentIframeUrl.includes('redirect') && currentIframeUrl.includes(PROXY_BASE)) {
+              try {
+                const url = new URL(currentIframeUrl);
+                const redirectUrl = url.searchParams.get('url');
+                if (redirectUrl) {
+                  const proxyUrl = getProxyUrl(redirectUrl, securitySettings.dnsOverHttps, securitySettings.dohProvider);
+                  iframe.src = proxyUrl;
+                  return;
+                }
+              } catch {}
+            }
+            
+            if (!currentIframeUrl.includes(PROXY_BASE) && currentIframeUrl.startsWith('http')) {
+              const iframeUrl = getProxyUrl(currentIframeUrl, securitySettings.dnsOverHttps, securitySettings.dohProvider);
+              iframe.src = iframeUrl;
+              return;
+            }
+            
             setTabs(prev => prev.map(tab => {
               if (tab.id === activeTabId) {
                 const newHistory = tab.history.slice(0, tab.historyIndex + 1);
@@ -347,9 +367,9 @@ const InAppBrowser = () => {
       }
     };
     
-    const interval = setInterval(checkIframeUrl, 1000);
+    const interval = setInterval(checkIframeUrl, 500);
     return () => clearInterval(interval);
-  }, [activeTabId, showSecurityPage, showHomepage, tabs]);
+  }, [activeTabId, showSecurityPage, showHomepage, tabs, securitySettings]);
 
   useEffect(() => {
     if (!isLocked || securitySettings.sessionTimeout <= 0) return;

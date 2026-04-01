@@ -104,7 +104,27 @@ export default async function(req: Request): Promise<Response> {
         "Accept-Language": "en-US,en;q=0.5",
         ...(dohEnabled && { "Host": target.hostname }),
       },
+      redirect: 'manual',
     });
+
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
+      const location = response.headers.get('location');
+      if (location) {
+        let redirectUrl = location;
+        try {
+          redirectUrl = new URL(location, targetUrl).href;
+        } catch {}
+        const isAbsoluteRedirect = location.startsWith('http://') || location.startsWith('https://');
+        return new Response(JSON.stringify({ 
+          redirect: isAbsoluteRedirect ? redirectUrl : null,
+          proxiedUrl: redirectUrl,
+          type: 'redirect'
+        }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+    }
 
     const contentType = response.headers.get("content-type") || "";
 

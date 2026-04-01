@@ -1,10 +1,35 @@
 {
   "$schema": "https://opencode.ai",
+  "autoupdate": true,
+  "permission": {
+    "edit": "allow",
+    "bash": "ask",
+    "webfetch": "allow",
+    "read": "allow"
+  },
   "command": {
     "secure": {
-      "description": "Run Snyk scan and fix vulnerabilities",
+      "description": "Run Snyk scan and suggest security fixes",
       "agent": "plan",
-      "template": "I am running a Snyk security scan. Here are the results: !`snyk code test`. \n\nReview these vulnerabilities, explain the risks, and provide the exact code changes needed to fix them. Focus on high-severity issues first.",
+      "template": "Run a Snyk security scan: !`snyk code test`. Review the vulnerabilities, explain the risks, and provide the exact code changes needed to fix them.",
+    },
+    "map": {
+      "description": "Map the project architecture and key data flows",
+      "agent": "plan",
+      "template": "Analyze the repository structure: !`ls -R`. Identify the core entry points, main data models, and how modules interact. Summarize the architecture in a brief project map.",
+      
+    },
+    "commit": {
+      "description": "Run security/tests and commit if successful",
+      "agent": "plan",
+      "template": "1. Run Snyk: !`snyk code test`. 2. Run Tests: !`npm test`. 3. If both pass, review staged changes: !`git diff --cached`. 4. Write a Conventional Commit message and execute: !`git commit -m \"$MESSAGE\"`. If anything fails, stop and show me the errors.",
+      
+    },
+    "cleanup": {
+      "description": "Remove debug code, unused imports, and simplify logic",
+      "agent": "build",
+      "template": "Analyze the current file or folder. 1. Remove all console.logs and commented-out code. 2. Remove unused imports. 3. Simplify complex logic for better readability.",
+      
     }
   }
 }

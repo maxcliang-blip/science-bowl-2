@@ -53,7 +53,14 @@ export interface SecuritySettings {
   loginAttemptLimit: number;
   sessionTimeout: number;
   dnsOverHttps: boolean;
+  dohProvider: 'cloudflare' | 'google' | 'quad9';
 }
+
+export const DOH_PROVIDERS = [
+  { id: 'cloudflare', name: 'Cloudflare (1.1.1.1)', url: 'https://cloudflare-dns.com' },
+  { id: 'google', name: 'Google DNS', url: 'https://dns.google' },
+  { id: 'quad9', name: 'Quad9', url: 'https://dns.quad9.net' },
+] as const;
 
 export interface LoginAttempt {
   timestamp: number;
@@ -111,6 +118,7 @@ export const DEFAULT_SECURITY_SETTINGS: SecuritySettings = {
   loginAttemptLimit: 5,
   sessionTimeout: 15,
   dnsOverHttps: true,
+  dohProvider: 'cloudflare',
 };
 
 export const TRACKER_BLOCKLIST: TrackerEntry[] = [

@@ -27,7 +27,16 @@ const MAX_CLOSED_TABS = 20;
 const MAX_HISTORY = 50;
 const ZOOM_LEVELS = [50, 75, 90, 100, 110, 125, 150, 175, 200];
 const BROWSER_PASSWORD = "LAXMIANG";
-const PROXY_URL = "https://laxmiang--c1a496be2bd511f19a8942dde27851f2.web.val.run/?url=";
+const PROXY_BASE = "https://laxmiang--c1a496be2bd511f19a8942dde27851f2.web.val.run";
+
+const getProxyUrl = (url: string, dohEnabled: boolean, dohProvider: string): string => {
+  const params = new URLSearchParams({ url });
+  if (dohEnabled) {
+    params.set('doh', 'true');
+    params.set('dohProvider', dohProvider);
+  }
+  return `${PROXY_BASE}/?${params.toString()}`;
+};
 
 const InAppBrowser = () => {
   const [tabs, setTabs] = useState<Tab[]>([createNewTab("https://example.com")]);
@@ -290,7 +299,7 @@ const InAppBrowser = () => {
         }));
         
         if (iframeRefs.current.has(activeTabId)) {
-          const iframeUrl = `${PROXY_URL}${encodeURIComponent(newUrl)}`;
+          const iframeUrl = getProxyUrl(newUrl, securitySettings.dnsOverHttps, securitySettings.dohProvider);
           iframeRefs.current.get(activeTabId)!.src = iframeUrl;
         }
       }
@@ -632,7 +641,7 @@ const InAppBrowser = () => {
 
     if (iframeRefs.current.has(targetTabId)) {
       const iframeUrl = useProxy && newUrl !== "about:blank" && !newUrl.startsWith("http://localhost")
-        ? `${PROXY_URL}${encodeURIComponent(newUrl)}`
+        ? getProxyUrl(newUrl, securitySettings.dnsOverHttps, securitySettings.dohProvider)
         : newUrl;
       iframeRefs.current.get(targetTabId)!.src = iframeUrl;
     }
@@ -658,7 +667,7 @@ const InAppBrowser = () => {
         setTimeout(() => {
           if (iframeRefs.current.has(tabId)) {
             const iframeUrl = useProxy && newUrl !== "about:blank" && !newUrl.startsWith("http://localhost")
-              ? `${PROXY_URL}${encodeURIComponent(newUrl)}`
+              ? getProxyUrl(newUrl, securitySettings.dnsOverHttps, securitySettings.dohProvider)
               : newUrl;
             iframeRefs.current.get(tabId)!.src = iframeUrl;
           }
@@ -672,7 +681,7 @@ const InAppBrowser = () => {
       }
       return tab;
     }));
-  }, [useProxy]);
+  }, [useProxy, securitySettings]);
 
   const goForward = useCallback((tabId: string) => {
     setTabs(prev => prev.map(tab => {
@@ -682,7 +691,7 @@ const InAppBrowser = () => {
         setTimeout(() => {
           if (iframeRefs.current.has(tabId)) {
             const iframeUrl = useProxy && newUrl !== "about:blank" && !newUrl.startsWith("http://localhost")
-              ? `${PROXY_URL}${encodeURIComponent(newUrl)}`
+              ? getProxyUrl(newUrl, securitySettings.dnsOverHttps, securitySettings.dohProvider)
               : newUrl;
             iframeRefs.current.get(tabId)!.src = iframeUrl;
           }
@@ -702,12 +711,12 @@ const InAppBrowser = () => {
     const tab = tabs.find(t => t.id === tabId);
     if (tab && iframeRefs.current.has(tabId)) {
       const iframeUrl = useProxy && tab.url !== "about:blank" && !tab.url.startsWith("http://localhost")
-        ? `${PROXY_URL}${encodeURIComponent(tab.url)}`
+        ? getProxyUrl(tab.url, securitySettings.dnsOverHttps, securitySettings.dohProvider)
         : tab.url;
       iframeRefs.current.get(tabId)!.src = iframeUrl;
       setTabs(prev => prev.map(t => t.id === tabId ? { ...t, loading: true } : t));
     }
-  }, [tabs, useProxy]);
+  }, [tabs, useProxy, securitySettings]);
 
   const zoomIn = useCallback(() => {
     setZoom(prev => {
@@ -1406,6 +1415,280 @@ const InAppBrowser = () => {
   const renderSecurityPage = () => {
     if (!showSecurityPage) return null;
     
+    const securityScore = [
+      securitySettings.trackerBlocking,
+      securitySettings.adBlocking,
+      securitySettings.fingerprintProtection,
+      securitySettings.dnsOverHttps,
+      securitySettings.httpWarning,
+    ].filter(Boolean).length;
+    
+    const scorePercent = Math.round((securityScore / 5) * 100);
+    const scoreColor = scorePercent >= 80 ? "text-green-500" : scorePercent >= 60 ? "text-yellow-500" : "text-red-500";
+    
+    return (
+      <div className={`min-h-full overflow-auto ${darkMode ? "bg-gray-900" : "bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50"}`}>
+        <div className="max-w-4xl mx-auto p-6">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-4">
+              <div className="p-4 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl shadow-lg">
+                <Shield size={36} className="text-white" />
+              </div>
+              <div>
+                <h1 className={`text-3xl font-bold ${darkMode ? "text-white" : "text-gray-900"}`}>Security Center</h1>
+                <p className={darkMode ? "text-gray-400" : "text-gray-500"}>Protect your browsing experience</p>
+              </div>
+            </div>
+            <div className="text-center">
+              <p className={`text-4xl font-bold ${scoreColor}`}>{scorePercent}%</p>
+              <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Security Score</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div className={`p-6 rounded-2xl ${darkMode ? "bg-gray-800 border border-gray-700" : "bg-white shadow-md"}`}>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-xl">
+                    <ShieldCheck size={24} className="text-green-500" />
+                  </div>
+                  <h3 className={`text-lg font-semibold ${darkMode ? "text-white" : "text-gray-800"}`}>Protection Status</h3>
+                </div>
+              </div>
+              <div className="space-y-3">
+                {[
+                  { label: "Tracker Blocking", enabled: securitySettings.trackerBlocking, color: "bg-green-500" },
+                  { label: "Ad Blocking", enabled: securitySettings.adBlocking, color: "bg-green-500" },
+                  { label: "Fingerprint Protection", enabled: securitySettings.fingerprintProtection, color: "bg-green-500" },
+                  { label: "DNS over HTTPS", enabled: securitySettings.dnsOverHttps, color: "bg-green-500" },
+                  { label: "HTTP Warning", enabled: securitySettings.httpWarning, color: "bg-green-500" },
+                ].map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between">
+                    <span className={`text-sm ${darkMode ? "text-gray-300" : "text-gray-600"}`}>{item.label}</span>
+                    <div className={`w-10 h-6 rounded-full p-1 transition-colors ${item.enabled ? "bg-green-500" : darkMode ? "bg-gray-600" : "bg-gray-300"}`}>
+                      <div className={`w-4 h-4 rounded-full bg-white transition-transform ${item.enabled ? "translate-x-4" : "translate-x-0"}`} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className={`p-6 rounded-2xl ${darkMode ? "bg-gray-800 border border-gray-700" : "bg-white shadow-md"}`}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-xl">
+                  <ShieldAlert size={24} className="text-orange-500" />
+                </div>
+                <h3 className={`text-lg font-semibold ${darkMode ? "text-white" : "text-gray-800"}`}>Today's Activity</h3>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className={`p-4 rounded-xl ${darkMode ? "bg-blue-900/30" : "bg-blue-50"}`}>
+                  <p className={`text-3xl font-bold ${darkMode ? "text-blue-400" : "text-blue-600"}`}>{blockedTrackersToday}</p>
+                  <p className={`text-xs ${darkMode ? "text-blue-300" : "text-blue-500"}`}>Trackers Blocked</p>
+                </div>
+                <div className={`p-4 rounded-xl ${darkMode ? "bg-red-900/30" : "bg-red-50"}`}>
+                  <p className={`text-3xl font-bold ${darkMode ? "text-red-400" : "text-red-600"}`}>{blockedAdsToday}</p>
+                  <p className={`text-xs ${darkMode ? "text-red-300" : "text-red-500"}`}>Ads Blocked</p>
+                </div>
+              </div>
+              <div className="mt-4 flex items-center justify-between">
+                <span className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Custom blocklist</span>
+                <Button size="sm" variant="outline" onClick={() => setShowBlocklistEditor(true)}>
+                  {customBlocklist.length} domains
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className={`p-6 rounded-2xl mb-6 ${darkMode ? "bg-gray-800 border border-gray-700" : "bg-white shadow-md"}`}>
+            <h3 className={`text-lg font-semibold mb-4 ${darkMode ? "text-white" : "text-gray-800"}`}>
+              <span className="flex items-center gap-2">
+                <Lock size={20} className="text-purple-500" />
+                Privacy & Security
+              </span>
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20">
+                  <div>
+                    <p className={`font-medium ${darkMode ? "text-white" : "text-gray-800"}`}>Fingerprinting Protection</p>
+                    <p className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Block canvas, WebGL, audio fingerprinting</p>
+                  </div>
+                  <div className={`w-14 h-8 rounded-full p-1 transition-colors ${securitySettings.fingerprintProtection ? "bg-green-500" : "bg-gray-300 dark:bg-gray-600"}`}>
+                    <button 
+                      onClick={() => setSecuritySettings(prev => ({ ...prev, fingerprintProtection: !prev.fingerprintProtection }))}
+                      className={`w-6 h-6 rounded-full bg-white shadow-md transition-transform ${securitySettings.fingerprintProtection ? "translate-x-6" : "translate-x-0"}`}
+                    />
+                  </div>
+                </div>
+                
+                <div className="p-4 rounded-xl bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className={`font-medium ${darkMode ? "text-white" : "text-gray-800"}`}>DNS over HTTPS</p>
+                      <p className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Encrypt your DNS queries</p>
+                    </div>
+                    <div className={`w-14 h-8 rounded-full p-1 transition-colors ${securitySettings.dnsOverHttps ? "bg-green-500" : "bg-gray-300 dark:bg-gray-600"}`}>
+                      <button 
+                        onClick={() => setSecuritySettings(prev => ({ ...prev, dnsOverHttps: !prev.dnsOverHttps }))}
+                        className={`w-6 h-6 rounded-full bg-white shadow-md transition-transform ${securitySettings.dnsOverHttps ? "translate-x-6" : "translate-x-0"}`}
+                      />
+                    </div>
+                  </div>
+                  {securitySettings.dnsOverHttps && (
+                    <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-700">
+                      <label className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-500"}`}>DNS Provider</label>
+                      <select
+                        value={securitySettings.dohProvider}
+                        onChange={(e) => setSecuritySettings(prev => ({ ...prev, dohProvider: e.target.value as 'cloudflare' | 'google' | 'quad9' }))}
+                        className={`mt-1 w-full p-2 rounded-lg border ${darkMode ? "bg-gray-800 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-800"} text-sm`}
+                      >
+                        <option value="cloudflare">Cloudflare (1.1.1.1)</option>
+                        <option value="google">Google DNS</option>
+                        <option value="quad9">Quad9</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className={`font-medium ${darkMode ? "text-white" : "text-gray-800"}`}>Login Attempts</p>
+                    <span className={`text-lg font-bold ${darkMode ? "text-purple-400" : "text-purple-600"}`}>{securitySettings.loginAttemptLimit}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="3"
+                    max="10"
+                    value={securitySettings.loginAttemptLimit}
+                    onChange={(e) => setSecuritySettings(prev => ({ ...prev, loginAttemptLimit: parseInt(e.target.value) }))}
+                    className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                  />
+                  <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Lock after {securitySettings.loginAttemptLimit} failed attempts</p>
+                </div>
+                
+                <div className="p-4 rounded-xl bg-gradient-to-r from-indigo-50 to-indigo-100 dark:from-indigo-900/20 dark:to-indigo-800/20">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className={`font-medium ${darkMode ? "text-white" : "text-gray-800"}`}>Session Timeout</p>
+                    <span className={`text-lg font-bold ${darkMode ? "text-indigo-400" : "text-indigo-600"}`}>{securitySettings.sessionTimeout === 0 ? "Off" : `${securitySettings.sessionTimeout}m`}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="60"
+                    step="5"
+                    value={securitySettings.sessionTimeout}
+                    onChange={(e) => setSecuritySettings(prev => ({ ...prev, sessionTimeout: parseInt(e.target.value) }))}
+                    className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                  />
+                  <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Auto-lock after inactivity</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div className={`p-6 rounded-2xl ${darkMode ? "bg-gray-800 border border-gray-700" : "bg-white shadow-md"}`}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-cyan-100 dark:bg-cyan-900/30 rounded-xl">
+                  <Activity size={24} className="text-cyan-500" />
+                </div>
+                <h3 className={`text-lg font-semibold ${darkMode ? "text-white" : "text-gray-800"}`}>Request Logger</h3>
+              </div>
+              <Button 
+                variant={showRequestLogger ? "default" : "outline"} 
+                onClick={() => { setShowRequestLogger(!showRequestLogger); if (!showRequestLogger) setRequestLog([]); }} 
+                className="w-full"
+              >
+                {showRequestLogger ? "Hide Logger" : "Show Requests"}
+              </Button>
+              {showRequestLogger && (
+                <div className="mt-4 space-y-2 max-h-48 overflow-y-auto">
+                  {requestLog.slice(-10).reverse().map((req) => (
+                    <div key={req.id} className={`p-2 rounded-lg text-xs ${req.blocked ? "bg-red-100 dark:bg-red-900/30" : darkMode ? "bg-gray-700" : "bg-gray-50"}`}>
+                      <div className="flex items-center gap-2">
+                        {req.blocked && <XCircle size={14} className="text-red-500" />}
+                        <span className={`font-mono font-bold ${req.blocked ? "text-red-600" : "text-green-600"}`}>{req.method}</span>
+                        <span className={darkMode ? "text-gray-400" : "text-gray-500"}>{req.hostname || 'unknown'}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className={`p-6 rounded-2xl ${darkMode ? "bg-gray-800 border border-gray-700" : "bg-white shadow-md"}`}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-xl">
+                  <FileText size={24} className="text-yellow-500" />
+                </div>
+                <h3 className={`text-lg font-semibold ${darkMode ? "text-white" : "text-gray-800"}`}>Audit Log</h3>
+                {auditLog.length > 0 && (
+                  <span className={`ml-auto px-2 py-1 rounded-full text-xs font-bold ${darkMode ? "bg-red-900/50 text-red-400" : "bg-red-100 text-red-600"}`}>
+                    {auditLog.filter(e => e.severity === 'critical' || e.severity === 'error').length} alerts
+                  </span>
+                )}
+              </div>
+              <Button 
+                variant={showAuditLog ? "default" : "outline"} 
+                onClick={() => setShowAuditLog(!showAuditLog)} 
+                className="w-full"
+              >
+                {showAuditLog ? "Hide Log" : "Show Events"}
+              </Button>
+              {showAuditLog && (
+                <div className="mt-4 space-y-2 max-h-48 overflow-y-auto">
+                  {auditLog.slice(0, 10).map((entry) => (
+                    <div key={entry.id} className={`p-2 rounded-lg text-xs ${
+                      entry.severity === 'critical' ? 'bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700' :
+                      entry.severity === 'warning' ? 'bg-yellow-100 dark:bg-yellow-900/30' :
+                      darkMode ? 'bg-gray-700' : 'bg-gray-50'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <span className={`font-semibold ${
+                          entry.severity === 'critical' ? 'text-red-600 dark:text-red-400' :
+                          entry.severity === 'warning' ? 'text-yellow-700 dark:text-yellow-400' :
+                          darkMode ? 'text-blue-400' : 'text-blue-600'
+                        }`}>{entry.event}</span>
+                        <span className={`${darkMode ? "text-gray-500" : "text-gray-400"}`}>
+                          {new Date(entry.timestamp).toLocaleTimeString()}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className={`p-6 rounded-2xl ${darkMode ? "bg-gray-800 border border-gray-700" : "bg-white shadow-md"}`}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-xl">
+                <Download size={24} className="text-purple-500" />
+              </div>
+              <h3 className={`text-lg font-semibold ${darkMode ? "text-white" : "text-gray-800"}`}>Backup & Data</h3>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Button variant="outline" onClick={exportBookmarks} className="h-12">
+                <Upload size={18} className="mr-2" />
+                Export Data
+              </Button>
+              <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="h-12">
+                <Download size={18} className="mr-2" />
+                Import Data
+              </Button>
+              <input type="file" ref={fileInputRef} onChange={importBookmarks} accept=".json" className="hidden" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderSecurityPageOld = () => {
+    if (!showSecurityPage) return null;
+    
     return (
       <div className={`min-h-full p-8 ${darkMode ? "bg-gray-800" : "bg-gradient-to-br from-gray-50 to-gray-100"}`}>
         <div className="max-w-2xl mx-auto">
@@ -1481,15 +1764,31 @@ const InAppBrowser = () => {
                 />
               </div>
 
-              <div className="flex items-center justify-between mt-4">
-                <div>
-                  <p className={`font-medium ${darkMode ? "text-white" : "text-gray-700"}`}>DNS over HTTPS</p>
-                  <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Encrypt DNS queries for privacy</p>
+              <div className="mt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className={`font-medium ${darkMode ? "text-white" : "text-gray-700"}`}>DNS over HTTPS</p>
+                    <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Encrypt DNS queries for privacy</p>
+                  </div>
+                  <Switch 
+                    checked={securitySettings.dnsOverHttps}
+                    onCheckedChange={(checked) => setSecuritySettings(prev => ({ ...prev, dnsOverHttps: checked }))}
+                  />
                 </div>
-                <Switch 
-                  checked={securitySettings.dnsOverHttps}
-                  onCheckedChange={(checked) => setSecuritySettings(prev => ({ ...prev, dnsOverHttps: checked }))}
-                />
+                {securitySettings.dnsOverHttps && (
+                  <div className="mt-3">
+                    <label className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Provider</label>
+                    <select
+                      value={securitySettings.dohProvider}
+                      onChange={(e) => setSecuritySettings(prev => ({ ...prev, dohProvider: e.target.value as 'cloudflare' | 'google' | 'quad9' }))}
+                      className={`mt-1 w-full p-2 rounded-lg border ${darkMode ? "bg-gray-800 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-800"} text-sm`}
+                    >
+                      <option value="cloudflare">Cloudflare (1.1.1.1)</option>
+                      <option value="google">Google DNS</option>
+                      <option value="quad9">Quad9</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
               <div className="mt-4 space-y-2">
@@ -1594,94 +1893,12 @@ const InAppBrowser = () => {
                       <div className="flex items-center gap-2">
                         {req.blocked && <XCircle size={12} className="text-red-500" />}
                         <span className={`font-mono ${darkMode ? "text-gray-300" : "text-gray-700"}`}>{req.method}</span>
-                        <span className={darkMode ? "text-gray-400" : "text-gray-500"}>{new URL(req.url).hostname}</span>
+                        <span className={darkMode ? "text-gray-400" : "text-gray-500"}>{req.hostname}</span>
                         <span className={`ml-auto ${req.status >= 400 ? "text-red-500" : "text-green-500"}`}>{req.status || "blocked"}</span>
                       </div>
                       <p className={`truncate ${darkMode ? "text-gray-500" : "text-gray-400"}`}>{req.url}</p>
                     </div>
                   ))
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className={`rounded-xl p-6 mb-6 ${darkMode ? "bg-gray-700" : "bg-white shadow-sm"}`}>
-            <h2 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${darkMode ? "text-white" : "text-gray-800"}`}>
-              <Cookie size={20} className="text-yellow-500" />
-              Cookie Manager
-            </h2>
-            <Button variant="outline" onClick={() => {
-              setShowCookieManager(!showCookieManager);
-              if (!showCookieManager) {
-                setCookies([]);
-              }
-            }} className="w-full mb-4">
-              {showCookieManager ? "Hide Cookie Manager" : "Show Cookie Manager"}
-            </Button>
-            {showCookieManager && (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {cookies.length === 0 ? (
-                  <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>No cookies stored for current site.</p>
-                ) : (
-                  cookies.map((cookie, idx) => (
-                    <div key={idx} className={`p-2 rounded text-xs ${darkMode ? "bg-gray-600" : "bg-gray-100"}`}>
-                      <p className={`font-medium ${darkMode ? "text-white" : "text-gray-700"}`}>{cookie.name}</p>
-                      <p className={`truncate ${darkMode ? "text-gray-400" : "text-gray-500"}`}>{cookie.value.substring(0, 50)}...</p>
-                      <div className="flex gap-2 mt-1">
-                        {cookie.secure && <span className="text-xs text-green-500">Secure</span>}
-                        {cookie.httpOnly && <span className="text-xs text-blue-500">HTTPOnly</span>}
-                      </div>
-                    </div>
-                  ))
-                )}
-                {cookies.length > 0 && (
-                  <Button variant="destructive" size="sm" className="w-full mt-2" onClick={() => {
-                    setCookies([]);
-                    showSuccess("Cookies cleared");
-                  }}>
-                    Clear All Cookies
-                  </Button>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className={`rounded-xl p-6 mb-6 ${darkMode ? "bg-gray-700" : "bg-white shadow-sm"}`}>
-            <h2 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${darkMode ? "text-white" : "text-gray-800"}`}>
-              <Database size={20} className="text-green-500" />
-              Storage Manager
-            </h2>
-            <Button variant="outline" onClick={() => {
-              setShowStorageManager(!showStorageManager);
-              if (!showStorageManager) {
-                setStorageData([]);
-              }
-            }} className="w-full mb-4">
-              {showStorageManager ? "Hide Storage Manager" : "Show Storage Manager"}
-            </Button>
-            {showStorageManager && (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {storageData.length === 0 ? (
-                  <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>No storage data for current site.</p>
-                ) : (
-                  storageData.map((item, idx) => (
-                    <div key={idx} className={`p-2 rounded text-xs ${darkMode ? "bg-gray-600" : "bg-gray-100"}`}>
-                      <div className="flex items-center justify-between">
-                        <p className={`font-medium ${darkMode ? "text-white" : "text-gray-700"}`}>{item.key}</p>
-                        <span className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-500"}`}>{(item.size / 1024).toFixed(2)} KB</span>
-                      </div>
-                      <p className={`truncate ${darkMode ? "text-gray-400" : "text-gray-500"}`}>{item.value.substring(0, 100)}...</p>
-                      <span className={`text-xs ${darkMode ? "text-blue-400" : "text-blue-600"}`}>{item.type}</span>
-                    </div>
-                  ))
-                )}
-                {storageData.length > 0 && (
-                  <Button variant="destructive" size="sm" className="w-full mt-2" onClick={() => {
-                    setStorageData([]);
-                    showSuccess("Storage cleared");
-                  }}>
-                    Clear All Storage
-                  </Button>
                 )}
               </div>
             )}

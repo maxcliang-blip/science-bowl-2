@@ -1,7 +1,78 @@
-export default async function(req: Request): Promise<Response> {
-  const url = new URL(req.url).searchParams.get("url");
+const DOH_PROVIDERS = {
+  cloudflare: "https://cloudflare-dns.com/dns-query",
+  google: "https://dns.google/resolve",
+  quad9: "https://dns.quad9.net:5053/dns-query",
+};
 
-  if (!url) {
+async function resolveDoH(hostname: string, provider: string = "cloudflare"): Promise<string | null> {
+  const endpoint = DOH_PROVIDERS[provider as keyof typeof DOH_PROVIDERS] || DOH_PROVIDERS.cloudflare;
+  
+  try {
+    const params = new URLSearchParams({
+      name: hostname,
+      type: "A",
+      cd: "false",
+    });
+
+    const response = await fetch(`${endpoint}?${params}`, {
+      headers: {
+        Accept: "application/dns-json",
+      },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    
+    if (data.Answer && data.Answer.length > 0) {
+      for (const answer of data.Answer) {
+        if (answer.type === 1) {
+          return answer.data;
+        }
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export default async function(req: Request): Promise<Response> {
+  const url = new URL(req.url);
+  const path = url.pathname;
+
+  if (path === "/dns") {
+    const hostname = url.searchParams.get("name");
+    const provider = url.searchParams.get("provider") || "cloudflare";
+
+    if (!hostname) {
+      return new Response(JSON.stringify({ error: "Missing hostname parameter" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const ip = await resolveDoH(hostname, provider);
+    return new Response(JSON.stringify({ hostname, ip, provider, resolved: !!ip }), {
+      status: 200,
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
+
+  if (path === "/providers") {
+    return new Response(JSON.stringify(Object.keys(DOH_PROVIDERS)), {
+      status: 200,
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
+
+  const targetUrl = url.searchParams.get("url");
+  const dohEnabled = url.searchParams.get("doh") === "true";
+  const dohProvider = url.searchParams.get("dohProvider") || "cloudflare";
+
+  if (!targetUrl) {
     return new Response(JSON.stringify({ error: "Missing url parameter" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
@@ -9,19 +80,29 @@ export default async function(req: Request): Promise<Response> {
   }
 
   try {
-    const targetUrl = new URL(url);
-    if (!["http:", "https:"].includes(targetUrl.protocol)) {
+    const target = new URL(targetUrl);
+    if (!["http:", "https:"].includes(target.protocol)) {
       return new Response(JSON.stringify({ error: "Invalid protocol" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
       });
     }
 
-    const response = await fetch(url, {
+    let fetchUrl = targetUrl;
+    
+    if (dohEnabled && target.hostname) {
+      const resolvedIP = await resolveDoH(target.hostname, dohProvider);
+      if (resolvedIP) {
+        fetchUrl = targetUrl.replace(target.hostname, resolvedIP);
+      }
+    }
+
+    const response = await fetch(fetchUrl, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.5",
+        ...(dohEnabled && { "Host": target.hostname }),
       },
     });
 
@@ -107,9 +188,9 @@ export default async function(req: Request): Promise<Response> {
     html = html.replace(/<meta[^>]*http-equiv=["']Content-Security-Policy["'][^>]*>/gi, "");
 
     if (/<head[^>]*>/i.test(html)) {
-      html = html.replace(/(<head[^>]*>)/i, `$1${proxyScripts}<base href="${targetUrl.origin}">`);
+      html = html.replace(/(<head[^>]*>)/i, `$1${proxyScripts}<base href="${target.origin}">`);
     } else {
-      html = `<head>${proxyScripts}<base href="${targetUrl.origin}"></head>` + html;
+      html = `<head>${proxyScripts}<base href="${target.origin}"></head>` + html;
     }
 
     const rewriteUrl = (u: string) => {
@@ -117,7 +198,7 @@ export default async function(req: Request): Promise<Response> {
         if (!u || u.startsWith("data:") || u.startsWith("blob:") || u.startsWith("javascript:") || u.startsWith("mailto:") || u.startsWith("#") || u.startsWith("//")) {
           return u;
         }
-        return new URL(u, targetUrl).href;
+        return new URL(u, target.href).href;
       } catch {
         return u;
       }

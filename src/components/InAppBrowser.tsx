@@ -102,6 +102,7 @@ const InAppBrowser = () => {
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
   const [showAuditLog, setShowAuditLog] = useState(false);
   const [lastActivity, setLastActivity] = useState<number>(Date.now());
+  const [iframeError, setIframeError] = useState<string | null>(null);
   
   const iframeRefs = useRef<Map<string, HTMLIFrameElement>>(new Map());
   const containerRef = useRef<HTMLDivElement>(null);
@@ -905,6 +906,14 @@ const InAppBrowser = () => {
       }
     } catch {}
   }, [tabs, securitySettings]);
+
+  const handleIframeError = useCallback((tabId: string) => {
+    const tab = tabs.find(t => t.id === tabId);
+    if (tab && !tab.url.includes('about:') && !tab.url.includes('lax://')) {
+      setIframeError(tab.url);
+    }
+    setTabs(prev => prev.map(t => t.id === tabId ? { ...t, loading: false } : t));
+  }, [tabs]);
 
   const handleSubmit = useCallback((e: React.FormEvent, url: string) => {
     e.preventDefault();
@@ -2471,15 +2480,43 @@ const InAppBrowser = () => {
           >
             <div className="h-full">
               {tabs.map(tab => (
-                <iframe
-                  key={tab.id}
-                  ref={(el) => { if (el) iframeRefs.current.set(tab.id, el); }}
-                  title={`Tab-${tab.id}`}
-                  className={`w-full h-full border-none rounded-xl ${tab.id === activeTabId && !showHomepage && !showSecurityPage ? 'block' : 'hidden'}`}
-                  src={tab.url}
-                  onLoad={() => handleIframeLoad(tab.id)}
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-top-navigation allow-top-navigation-by-user-activation"
-                />
+                <div key={tab.id} className={`relative w-full h-full ${tab.id === activeTabId && !showHomepage && !showSecurityPage ? 'block' : 'hidden'}`}>
+                  <iframe
+                    ref={(el) => { if (el) iframeRefs.current.set(tab.id, el); }}
+                    title={`Tab-${tab.id}`}
+                    className="w-full h-full border-none rounded-xl"
+                    src={tab.url}
+                    onLoad={() => handleIframeLoad(tab.id)}
+                    onError={() => handleIframeError(tab.id)}
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-top-navigation allow-top-navigation-by-user-activation"
+                  />
+                  {iframeError && tab.id === activeTabId && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-white dark:bg-gray-900 rounded-xl">
+                      <ShieldAlert className="w-16 h-16 text-yellow-500 mb-4" />
+                      <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">Site Blocked</h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 text-center px-8">
+                        This site doesn't allow embedding in iframes.<br />
+                        For security, please use the button below.
+                      </p>
+                      <button
+                        onClick={() => {
+                          window.open(iframeError, '_blank');
+                          setIframeError(null);
+                        }}
+                        className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2"
+                      >
+                        <ExternalLink size={16} />
+                        Open in New Tab
+                      </button>
+                      <button
+                        onClick={() => setIframeError(null)}
+                        className="mt-3 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  )}
+                </div>
               ))}
               
               {showHomepage && activeTabId && !showSecurityPage && (

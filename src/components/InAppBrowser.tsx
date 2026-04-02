@@ -279,6 +279,11 @@ const InAppBrowser = () => {
         setShowSecurityPage(false);
         setShowHomepage(false);
         
+        const iframe = iframeRefs.current.get(activeTabId);
+        if (iframe) {
+          iframe.src = 'about:blank';
+        }
+        
         setTabs(prev => prev.map(tab => {
           if (tab.id === activeTabId) {
             const newHistory = tab.history.slice(0, tab.historyIndex + 1);
@@ -299,15 +304,24 @@ const InAppBrowser = () => {
           return tab;
         }));
         
-        if (iframeRefs.current.has(activeTabId)) {
+        if (iframe) {
           const iframeUrl = getProxyUrl(newUrl, securitySettings.dnsOverHttps, securitySettings.dohProvider);
-          iframeRefs.current.get(activeTabId)!.src = iframeUrl;
+          iframe.src = iframeUrl;
+        }
+      }
+      
+      if (event.data?.type === 'stopped') {
+        const iframe = iframeRefs.current.get(activeTabId);
+        if (iframe && iframe.contentWindow) {
+          try {
+            iframe.contentWindow.stop();
+          } catch {}
         }
       }
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [activeTabId, showSecurityPage, showHomepage, tabs]);
+  }, [activeTabId, showSecurityPage, showHomepage, tabs, securitySettings]);
 
   useEffect(() => {
     if (showSecurityPage || showHomepage) return;

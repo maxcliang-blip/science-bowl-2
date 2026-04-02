@@ -131,29 +131,50 @@ export default async function(req: Request): Promise<Response> {
 (function() {
   'use strict';
   
-  // Store original location
   const originalLocation = window.location.href;
+  let redirectTimeout = null;
   
-  // Intercept redirects
+  function sendNavigate(url) {
+    if (window.parent !== window && url && url.startsWith('http')) {
+      window.parent.postMessage({ type: 'navigate', url: url }, '*');
+      return true;
+    }
+    return false;
+  }
+  
+  function handleRedirect(url) {
+    if (sendNavigate(url)) {
+      if (redirectTimeout) clearTimeout(redirectTimeout);
+      redirectTimeout = setTimeout(function() {
+        window.stop && window.stop();
+        document.write && document.write('<html><body><script>if(parent){parent.postMessage({type:"stopped"}, "*");}<\/script>Redirecting...</body></html>');
+        document.close && document.close();
+      }, 100);
+    }
+  }
+  
   Object.defineProperty(window, 'location', {
     get: function() {
       return new Proxy(window._location, {
         get: function(target, prop) {
           if (prop === 'href') {
             const newHref = window._location.href;
-            if (newHref !== originalLocation && window.parent !== window) {
-              window.parent.postMessage({ type: 'navigate', url: newHref }, '*');
-            }
             return newHref;
+          }
+          if (prop === 'replace' || prop === 'assign') {
+            return function(url) { handleRedirect(url); };
+          }
+          if (prop === 'reload') {
+            return function() { sendNavigate(originalLocation); };
           }
           return target[prop];
         },
         set: function(target, prop, value) {
-          if (prop === 'href' && window.parent !== window) {
-            window.parent.postMessage({ type: 'navigate', url: value }, '*');
-            return true;
+          if (prop === 'href') {
+            handleRedirect(value);
+          } else {
+            target[prop] = value;
           }
-          target[prop] = value;
           return true;
         }
       });
@@ -161,36 +182,80 @@ export default async function(req: Request): Promise<Response> {
     set: function(val) { window._location = val; }
   });
   
-  // Store original location
   window._location = { ...window.location };
   
-  // Intercept form submissions
+  window.location.replace = function(url) { handleRedirect(url); };
+  window.location.assign = function(url) { handleRedirect(url); };
+  
+  window.open = function(url, name, features) {
+    if (url && url.startsWith('http')) {
+      handleRedirect(url);
+      return null;
+    }
+    return window._origOpen.call(window, url, name, features);
+  };
+  window._origOpen = window.open;
+  
   document.addEventListener('submit', function(e) {
     const form = e.target;
-    if (form.method === 'get') {
+    if (form.method && form.method.toLowerCase() === 'get') {
       e.preventDefault();
       const action = form.action || window.location.href;
       const formData = new FormData(form);
       const params = new URLSearchParams(formData).toString();
       const navUrl = action.includes('?') ? action + '&' + params : action + '?' + params;
+      handleRedirect(navUrl);
+    }
+  });
+  
+  document.addEventListener('click', function(e) {
+    const link = e.target.closest('a');
+    if (link && link.href && !link.href.startsWith('javascript:') && !link.href.startsWith('data:')) {
       if (window.parent !== window) {
-        window.parent.postMessage({ type: 'navigate', url: navUrl }, '*');
-      } else {
-        window.location.href = navUrl;
+        e.preventDefault();
+        handleRedirect(link.href);
       }
     }
   });
   
-  // Intercept link clicks
-  document.addEventListener('click', function(e) {
-    const link = e.target.closest('a');
-    if (link && link.href && !link.href.startsWith('javascript:')) {
-      if (window.parent !== window) {
-        e.preventDefault();
-        window.parent.postMessage({ type: 'navigate', url: link.href }, '*');
+  function checkMetaRefresh() {
+    const metas = document.querySelectorAll('meta[http-equiv="refresh"]');
+    metas.forEach(function(meta) {
+      const content = meta.getAttribute('content');
+      if (content) {
+        const match = content.match(/url=([^;]+)/i);
+        if (match && match[1]) {
+          let url = match[1].trim();
+          try { url = new URL(url, window.location.href).href; } catch {}
+          handleRedirect(url);
+        }
       }
-    }
-  });
+    });
+  }
+  
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', checkMetaRefresh);
+  } else {
+    checkMetaRefresh();
+  }
+  
+  var originalSetTimeout = window.setTimeout;
+  window.setTimeout = function(func, delay) {
+    var args = Array.prototype.slice.call(arguments, 2);
+    return originalSetTimeout(function() {
+      if (typeof func === 'string') {
+        var match = func.match(/window\.location\.href\s*=\s*["']([^"']+)["']/);
+        if (match) { handleRedirect(match[1]); return; }
+        match = func.match(/location\.replace\s*\(\s*["']([^"']+)["']\s*\)/);
+        if (match) { handleRedirect(match[1]); return; }
+        match = func.match(/location\.assign\s*\(\s*["']([^"']+)["']\s*\)/);
+        if (match) { handleRedirect(match[1]); return; }
+      }
+      if (typeof func === 'function') {
+        func.apply(null, args);
+      }
+    }, delay);
+  };
 })();
 </script>`;
 

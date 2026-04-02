@@ -1,5 +1,5 @@
 {
-  "$schema": "https://opencode.ai",
+  "$schema": "https://opencode.ai/config.json",
   "autoupdate": true,
   "permission": {
     "edit": "allow",

@@ -852,7 +852,59 @@ const InAppBrowser = () => {
     setTabs(prev => prev.map(tab => 
       tab.id === tabId ? { ...tab, loading: false } : tab
     ));
-  }, []);
+    
+    const iframe = iframeRefs.current.get(tabId);
+    if (!iframe || !iframe.contentWindow) return;
+    
+    try {
+      const iframeUrl = iframe.contentWindow.location.href;
+      const currentTab = tabs.find(t => t.id === tabId);
+      if (!currentTab) return;
+      
+      if (iframeUrl !== currentTab.url && !iframeUrl.includes('about:')) {
+        if (!iframeUrl.includes(PROXY_BASE)) {
+          const proxyUrl = getProxyUrl(iframeUrl, securitySettings.dnsOverHttps, securitySettings.dohProvider);
+          iframe.src = proxyUrl;
+          return;
+        }
+        
+        if (iframeUrl.includes('url=')) {
+          try {
+            const url = new URL(iframeUrl);
+            const redirectUrl = url.searchParams.get('url');
+            if (redirectUrl && redirectUrl.startsWith('http')) {
+              const proxyUrl = getProxyUrl(redirectUrl, securitySettings.dnsOverHttps, securitySettings.dohProvider);
+              iframe.src = proxyUrl;
+              return;
+            }
+          } catch {}
+        }
+        
+        const tabIndex = tabs.findIndex(t => t.id === tabId);
+        if (tabIndex !== -1) {
+          const targetUrl = iframeUrl.includes('url=') ? new URL(iframeUrl).searchParams.get('url') || iframeUrl : iframeUrl;
+          if (targetUrl.startsWith('http')) {
+            setTabs(prev => {
+              const newTabs = [...prev];
+              const tab = { ...newTabs[tabIndex] };
+              const newHistory = tab.history.slice(0, tab.historyIndex + 1);
+              if (newHistory[newHistory.length - 1] !== targetUrl) {
+                newHistory.push(targetUrl);
+                if (newHistory.length > MAX_HISTORY) newHistory.shift();
+              }
+              tab.url = targetUrl;
+              tab.title = new URL(targetUrl).hostname;
+              tab.favicon = `https://www.google.com/s2/favicons?domain=${new URL(targetUrl).hostname}&sz=32`;
+              tab.history = newHistory;
+              tab.historyIndex = newHistory.length - 1;
+              newTabs[tabIndex] = tab;
+              return newTabs;
+            });
+          }
+        }
+      }
+    } catch {}
+  }, [tabs, securitySettings]);
 
   const handleSubmit = useCallback((e: React.FormEvent, url: string) => {
     e.preventDefault();

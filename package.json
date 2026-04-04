@@ -9,6 +9,10 @@
     "preview": "vite preview --config config/vite.config.ts"
   },
   "dependencies": {
+    "@mercuryworkshop/bare-mux": "^2.1.8",
+    "@mercuryworkshop/epoxy-transport": "^3.0.1",
+    "@mercuryworkshop/scramjet": "^1.0.2",
+    "@mercuryworkshop/wisp-js": "^0.4.1",
     "@radix-ui/react-dialog": "^1.1.2",
     "@radix-ui/react-dropdown-menu": "^2.1.1",
     "@radix-ui/react-popover": "^1.1.1",

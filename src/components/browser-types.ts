@@ -54,13 +54,99 @@ export interface SecuritySettings {
   sessionTimeout: number;
   dnsOverHttps: boolean;
   dohProvider: 'cloudflare' | 'google' | 'quad9';
+  searchEngine: string;
+  userAgent: string;
+  restoreTabsOnStartup: boolean;
+  vpnEnabled: boolean;
+  vpnProvider: 'custom' | 'wireguard' | 'openvpn' | 'ipsec';
+  vpnConfig: VpnConfig;
 }
+
+export interface VpnConfig {
+  server: string;
+  port: number;
+  protocol: 'udp' | 'tcp';
+  authFile?: string;
+  customConfig?: string;
+}
+
+export const VPN_PROVIDERS = [
+  { id: 'wireguard', name: 'WireGuard', description: 'Modern, fast VPN protocol' },
+  { id: 'openvpn', name: 'OpenVPN', description: 'Open source VPN solution' },
+  { id: 'ipsec', name: 'IPSec/L2TP', description: 'Built-in OS VPN support' },
+  { id: 'custom', name: 'Custom Config', description: 'Paste your own VPN configuration' },
+] as const;
+
+export const VPN_SERVER_PRESETS = [
+  { name: ' Mullvad (WireGuard)', protocol: 'udp', port: 51820, example: 'wg.mullvad.net' },
+  { name: 'NordVPN', protocol: 'udp', port: 51820, example: 'nordvpn.com' },
+  { name: 'ProtonVPN', protocol: 'udp', port: 51820, example: 'vpn.proton.me' },
+  { name: 'Windscribe', protocol: 'tcp', port: 443, example: 'ca.gervas.io' },
+] as const;
 
 export const DOH_PROVIDERS = [
   { id: 'cloudflare', name: 'Cloudflare (1.1.1.1)', url: 'https://cloudflare-dns.com' },
   { id: 'google', name: 'Google DNS', url: 'https://dns.google' },
   { id: 'quad9', name: 'Quad9', url: 'https://dns.quad9.net' },
 ] as const;
+
+export const SEARCH_ENGINES = [
+  { id: 'duckduckgo', name: 'DuckDuckGo', url: 'https://duckduckgo.com/?q=', icon: '🔍' },
+  { id: 'google', name: 'Google', url: 'https://google.com/search?q=', icon: '🔎' },
+  { id: 'bing', name: 'Bing', url: 'https://bing.com/search?q=', icon: '🌐' },
+  { id: 'startpage', name: 'Startpage', url: 'https://www.startpage.com/do/search?query=', icon: '🛡️' },
+  { id: 'brave', name: 'Brave Search', url: 'https://search.brave.com/search?q=', icon: '🦁' },
+  { id: 'yahoo', name: 'Yahoo', url: 'https://search.yahoo.com/search?p=', icon: '📧' },
+  { id: 'ecosia', name: 'Ecosia', url: 'https://www.ecosia.org/search?q=', icon: '🌳' },
+  { id: 'qwant', name: 'Qwant', url: 'https://www.qwant.com/?l=en&q=', icon: '💙' },
+  { id: 'searx', name: 'SearX', url: 'https://searxng.org/search?q=', icon: '🔮' },
+] as const;
+
+export const USER_AGENTS = [
+  { id: 'chrome-win', name: 'Chrome (Windows)', value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36' },
+  { id: 'chrome-mac', name: 'Chrome (Mac)', value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36' },
+  { id: 'chrome-linux', name: 'Chrome (Linux)', value: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36' },
+  { id: 'firefox-win', name: 'Firefox (Windows)', value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0' },
+  { id: 'firefox-mac', name: 'Firefox (Mac)', value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:123.0) Gecko/20100101 Firefox/123.0' },
+  { id: 'safari', name: 'Safari (Mac)', value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15' },
+  { id: 'edge', name: 'Edge', value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0' },
+  { id: 'mobile-chrome', name: 'Chrome (Mobile)', value: 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36' },
+  { id: 'mobile-safari', name: 'Safari (Mobile)', value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Mobile/15E148 Safari/604.1' },
+] as const;
+
+export interface Download {
+  id: string;
+  url: string;
+  filename: string;
+  progress: number;
+  status: 'pending' | 'downloading' | 'completed' | 'failed' | 'cancelled';
+  size?: number;
+  downloaded?: number;
+  startedAt: number;
+  completedAt?: number;
+  error?: string;
+}
+
+export interface BlockedAdEntry {
+  domain: string;
+  timestamp: number;
+  rule: string;
+  type: 'ad' | 'tracker';
+}
+
+export interface ReadingSettings {
+  fontSize: number;
+  fontFamily: 'serif' | 'sans-serif';
+  lineHeight: number;
+  theme: 'light' | 'sepia' | 'dark';
+}
+
+export const DEFAULT_READING_SETTINGS: ReadingSettings = {
+  fontSize: 18,
+  fontFamily: 'serif',
+  lineHeight: 1.6,
+  theme: 'light',
+};
 
 export interface LoginAttempt {
   timestamp: number;
@@ -119,6 +205,16 @@ export const DEFAULT_SECURITY_SETTINGS: SecuritySettings = {
   sessionTimeout: 15,
   dnsOverHttps: true,
   dohProvider: 'cloudflare',
+  searchEngine: 'duckduckgo',
+  userAgent: 'chrome-win',
+  restoreTabsOnStartup: true,
+  vpnEnabled: false,
+  vpnProvider: 'wireguard',
+  vpnConfig: {
+    server: '',
+    port: 51820,
+    protocol: 'udp',
+  },
 };
 
 export const TRACKER_BLOCKLIST: TrackerEntry[] = [

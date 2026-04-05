@@ -1,0 +1,11 @@
+{
+  "name": "wisp-server",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node wisp-server.mjs"
+  },
+  "dependencies": {
+    "@mercuryworkshop/wisp-js": "^0.4.1"
+  }
+}

@@ -10,18 +10,10 @@ let state = {
   error: null,
 };
 
-function loadScript(src) {
-  return new Promise((resolve, reject) => {
-    if (document.querySelector(`script[src="${src}"]`)) {
-      resolve();
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = src;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error(`Failed to load ${src}`));
-    document.head.appendChild(script);
-  });
+async function fetchScript(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Failed to fetch ${url}`);
+  return await response.text();
 }
 
 export async function initScramjet(customWispUrl = '') {
@@ -38,38 +30,51 @@ export async function initScramjet(customWispUrl = '') {
   }
 
   try {
-    console.log('[Scramjet] Loading scripts...');
+    console.log('[Scramjet] Fetching scripts...');
     
-    // Load in correct order: codecs -> config -> bundle -> worker -> client
-    await loadScript('/scram/scramjet.codecs.js');
-    await loadScript('/scramjet.config.js');
-    await loadScript('/scram/scramjet.bundle.js');
-    await loadScript('/baremux/worker.mjs');
-    await loadScript('/scram/scramjet.worker.js');
-    await loadScript('/scram/scramjet.client.js');
-
-    console.log('[Scramjet] Scripts loaded, registering service worker...');
+    // Fetch and execute scripts in order
+    const scripts = [
+      '/scram/scramjet.codecs.js',
+      '/scramjet.config.js',
+      '/scram/scramjet.bundle.js',
+      '/baremux/worker.mjs',
+      '/scram/scramjet.worker.js',
+      '/scram/scramjet.client.js',
+    ];
+    
+    for (const src of scripts) {
+      console.log('[Scramjet] Loading:', src);
+      const code = await fetchScript(src);
+      eval(code);
+    }
+    
+    console.log('[Scramjet] Scripts loaded');
+    console.log('[Scramjet] Codecs:', typeof self.__scramjet$codecs);
+    console.log('[Scramjet] Config:', typeof self.__scramjet$config);
+    
+    if (typeof self.__scramjet$codecs === 'undefined') {
+      throw new Error('Codecs not loaded');
+    }
+    
+    console.log('[Scramjet] Registering SW...');
     
     const reg = await navigator.serviceWorker.register('/sw-scramjet.js', { scope: '/' });
-    console.log('[Scramjet] Service worker registered:', reg.active ? 'active' : 'waiting');
-
+    await new Promise(r => setTimeout(r, 1000));
+    
+    console.log('[Scramjet] Connecting BareMux...');
+    
     if (window.BareMux?.BareMuxConnection) {
-      console.log('[Scramjet] Connecting to BareMux...');
       const connection = new window.BareMux.BareMuxConnection('/baremux/worker.mjs');
       
       try {
-        console.log('[Scramjet] Setting transport with Wisp:', wispUrl);
-        await connection.setTransport('/epoxy/index.mjs', [{ 
-          wisp: wispUrl 
-        }]);
-        console.log('[Scramjet] Connected to Wisp:', wispUrl);
+        await connection.setTransport('/epoxy/index.mjs', [{ wisp: wispUrl }]);
+        console.log('[Scramjet] Connected!');
       } catch (e) {
         console.error('[Scramjet] Transport error:', e);
-        state.error = 'Failed to connect to Wisp: ' + e.message;
+        state.error = 'Transport failed';
       }
     } else {
-      console.error('[Scramjet] BareMux not found!');
-      state.error = 'BareMux not loaded';
+      state.error = 'BareMux not found';
     }
 
     state.isInitialized = true;
@@ -77,7 +82,7 @@ export async function initScramjet(customWispUrl = '') {
     return state;
   } catch (error) {
     state.error = error.message;
-    console.error('[Scramjet] Init failed:', error);
+    console.error('[Scramjet] Failed:', error);
     return state;
   }
 }

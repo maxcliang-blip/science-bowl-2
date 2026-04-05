@@ -40,14 +40,18 @@ export async function initScramjet(customWispUrl = '') {
   try {
     console.log('[Scramjet] Loading scripts...');
     
-    await loadScript('/baremux/worker.mjs');
+    // Load in correct order: codecs -> config -> bundle -> worker -> client
+    await loadScript('/scram/scramjet.codecs.js');
     await loadScript('/scramjet.config.js');
     await loadScript('/scram/scramjet.bundle.js');
+    await loadScript('/baremux/worker.mjs');
+    await loadScript('/scram/scramjet.worker.js');
     await loadScript('/scram/scramjet.client.js');
 
-    console.log('[Scramjet] Registering service worker...');
-    await navigator.serviceWorker.register('/sw-scramjet.js', { scope: '/' });
-    console.log('[Scramjet] Service worker registered');
+    console.log('[Scramjet] Scripts loaded, registering service worker...');
+    
+    const reg = await navigator.serviceWorker.register('/sw-scramjet.js', { scope: '/' });
+    console.log('[Scramjet] Service worker registered:', reg.active ? 'active' : 'waiting');
 
     if (window.BareMux?.BareMuxConnection) {
       console.log('[Scramjet] Connecting to BareMux...');

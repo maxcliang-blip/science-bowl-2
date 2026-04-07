@@ -8,8 +8,7 @@ import {
   Camera, Download, ChevronRight, Shield, AlertTriangle,
   Upload, ShieldAlert, ShieldCheck, List, KeyRound, Eye as EyeIcon,
   Link2, Link2Off, Cookie, FileText, Database, Activity, XCircle,
-  ExternalLink, Download as DownloadIcon, EyeOff as ReadingIcon, FileBarChart, Settings, GripVertical,
-  Rocket, Zap
+  ExternalLink, Download as DownloadIcon, EyeOff as ReadingIcon, FileBarChart, Settings, GripVertical
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -29,18 +28,10 @@ const MAX_CLOSED_TABS = 20;
 const MAX_HISTORY = 50;
 const ZOOM_LEVELS = [50, 75, 90, 100, 110, 125, 150, 175, 200];
 const BROWSER_PASSWORD = "LAXMIANG";
-const PROXY_BASE = "https://laxmiang--c1a496be2bd511f19a8942dde27851f2.web.val.run";
+const PROXY_BASE = "https://scramjet-proxy-w3mj.onrender.com";
 
-const getProxyUrl = (url: string, dohEnabled: boolean, dohProvider: string, userAgent?: string): string => {
-  const params = new URLSearchParams({ url });
-  if (dohEnabled) {
-    params.set('doh', 'true');
-    params.set('dohProvider', dohProvider);
-  }
-  if (userAgent && userAgent !== 'chrome-win') {
-    params.set('ua', userAgent);
-  }
-  return `${PROXY_BASE}/?${params.toString()}`;
+const getProxyUrl = (url: string, _dohEnabled: boolean, _dohProvider: string, _userAgent?: string): string => {
+  return `${PROXY_BASE}/scramble?url=${encodeURIComponent(url)}`;
 };
 
 const InAppBrowser = () => {
@@ -94,8 +85,6 @@ const InAppBrowser = () => {
   const [passwordError, setPasswordError] = useState(false);
   
   const [useProxy, setUseProxy] = useState(true);
-  const [useScramjet, setUseScramjet] = useState(false);
-  const [scramjetReady, setScramjetReady] = useState(false);
   const [showRequestLogger, setShowRequestLogger] = useState(false);
   const [requestLog, setRequestLog] = useState<RequestLogEntry[]>([]);
   const [showCookieManager, setShowCookieManager] = useState(false);
@@ -272,11 +261,10 @@ const InAppBrowser = () => {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
-        const response = await fetch(`${PROXY_BASE}/health`, { signal: controller.signal });
+        const response = await fetch(`${PROXY_BASE}/`, { signal: controller.signal });
         clearTimeout(timeoutId);
         if (response.ok) {
-          const data = await response.json();
-          setProxyHealth({ status: 'ok', uptime: data.uptime, version: data.version, cacheSize: data.cacheSize, lastCheck: Date.now() });
+          setProxyHealth({ status: 'ok', uptime: 0, version: 'scramjet', cacheSize: 0, lastCheck: Date.now() });
         } else {
           setProxyHealth(prev => ({ ...prev, status: 'error', lastCheck: Date.now() }));
         }
@@ -307,32 +295,6 @@ const InAppBrowser = () => {
   }, []);
 
   useEffect(() => {
-    const initScramjetIfEnabled = async () => {
-      if (useScramjet && !scramjetReady) {
-        try {
-          await new Promise<void>((resolve, reject) => {
-            const script = document.createElement('script');
-            script.type = 'module';
-            script.src = '/scramjet-init.mjs';
-            script.onload = () => resolve();
-            script.onerror = () => reject(new Error('Failed to load Scramjet'));
-            document.head.appendChild(script);
-          });
-          
-          const win = window as any;
-          if (typeof win.initScramjet === 'function') {
-            const result = await win.initScramjet();
-            setScramjetReady(result.isInitialized);
-          }
-        } catch (e) {
-          console.error('Scramjet init error:', e);
-        }
-      }
-    };
-    initScramjetIfEnabled();
-  }, [useScramjet, scramjetReady]);
-
-  useEffect(() => {
     if (!activeTab || showHomepage || showSecurityPage) return;
     
     const iframe = iframeRefs.current.get(activeTabId);
@@ -344,16 +306,9 @@ const InAppBrowser = () => {
         const shouldBypassProxy = directDomains.some(d => domain.endsWith(d) || domain === d);
         const isKnownDirectSite = KNOWN_DIRECT_ONLY.some(s => domain.includes(s));
         
-        let iframeUrl;
-        const win = window as any;
-        
-        if (useScramjet && win.isScramjetReady?.()) {
-          iframeUrl = `/scramjet/?url=${encodeURIComponent(activeTab.url)}`;
-        } else if (useProxy && !shouldBypassProxy && !isKnownDirectSite) {
-          iframeUrl = getProxyUrl(activeTab.url, securitySettings.dnsOverHttps, securitySettings.dohProvider, securitySettings.userAgent);
-        } else {
-          iframeUrl = activeTab.url;
-        }
+        const iframeUrl = (useProxy && !shouldBypassProxy && !isKnownDirectSite)
+          ? getProxyUrl(activeTab.url, securitySettings.dnsOverHttps, securitySettings.dohProvider, securitySettings.userAgent)
+          : activeTab.url;
         
         if (iframe.src !== iframeUrl) {
           iframe.src = iframeUrl;
@@ -368,7 +323,7 @@ const InAppBrowser = () => {
         iframe.src = activeTab.url;
       }
     }
-  }, [activeTabId, activeTab?.url, activeTab?.loading, showHomepage, showSecurityPage, useProxy, useScramjet, scramjetReady, securitySettings, directDomains]);
+  }, [activeTabId, activeTab?.url, activeTab?.loading, showHomepage, showSecurityPage, useProxy, securitySettings, directDomains]);
 
   useEffect(() => {
     const today = new Date().toDateString();
@@ -1197,17 +1152,8 @@ const InAppBrowser = () => {
   }, [navigateTo]);
 
   const clearProxyCache = useCallback(async () => {
-    try {
-      const response = await fetch(`${PROXY_BASE}/cache?clear=true`);
-      if (response.ok) {
-        showSuccess("Proxy cache cleared");
-        setProxyHealth(prev => ({ ...prev, cacheSize: 0 }));
-      } else {
-        showError("Failed to clear cache");
-      }
-    } catch {
-      showError("Proxy unavailable");
-    }
+    showSuccess("Cache cleared (Scramjet proxy - no server-side cache)");
+    setProxyHealth(prev => ({ ...prev, cacheSize: 0 }));
   }, []);
 
   const getBookmarksInFolder = useCallback((folderId: string | undefined) => {
@@ -1786,60 +1732,6 @@ const InAppBrowser = () => {
                 <div className="pt-2 border-t border-gray-100 dark:border-gray-700">
                   <div className="text-xs text-gray-400">
                     Proxy {useProxy ? 'enabled' : 'disabled'} - bypasses X-Frame restrictions
-                  </div>
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
-
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setUseScramjet(prev => !prev)}
-                className={`p-2 rounded-full relative ${useScramjet ? (darkMode ? "bg-blue-900/50 text-blue-400" : "bg-blue-100 text-blue-600") : (darkMode ? "hover:bg-gray-700 text-gray-500" : "hover:bg-gray-200 text-gray-400")}`}
-              >
-                <Rocket size={18} />
-                {scramjetReady && useScramjet && (
-                  <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-blue-500 rounded-full border-2 border-white dark:border-gray-800" title="Scramjet active" />
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-64 p-3 bg-white border border-gray-200 rounded-md shadow-lg dark:bg-gray-800 dark:border-gray-700">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium dark:text-white">Scramjet Mode</span>
-                  <span className={`text-xs px-2 py-0.5 rounded ${scramjetReady ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-400' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-400'}`}>
-                    {scramjetReady ? 'Ready' : 'Not Ready'}
-                  </span>
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">
-                  Advanced proxy that intercepts all requests (XHR, WebSocket, etc.). 
-                  Better for sites like Discord and GitHub.
-                </div>
-                <div className="text-xs text-gray-400 dark:text-gray-500 italic">
-                  Requires Wisp server connection
-                </div>
-                <div className="mt-2">
-                  <label className="text-xs text-gray-500 dark:text-gray-400">Wisp Server URL</label>
-                  <Input
-                    type="text"
-                    placeholder="wss://your-wisp-server.com/wisp"
-                    defaultValue={typeof window !== 'undefined' ? localStorage.getItem('browserCustomWispUrl') || '' : ''}
-                    onBlur={(e) => {
-                      if (e.target.value) {
-                        localStorage.setItem('browserCustomWispUrl', e.target.value);
-                        const win = window as any;
-                        if (win.setCustomWispUrl) win.setCustomWispUrl(e.target.value);
-                      }
-                    }}
-                    className="h-7 text-xs mt-1"
-                  />
-                </div>
-                <div className="pt-2 border-t border-gray-100 dark:border-gray-700">
-                  <div className="text-xs text-gray-400">
-                    Scramjet {useScramjet ? 'enabled' : 'disabled'}
                   </div>
                 </div>
               </div>
